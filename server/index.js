@@ -86,11 +86,10 @@ io.on('connection', (socket) => {
 
     const room = gameLoop.getRoom(roomId);
     
-    // Assign spawn positions based on roles
-    let spawnPosition = [0, 0.6, 0];
-    if (role === 'engineer') spawnPosition = [-3, 0.6, -2];
-    if (role === 'technician') spawnPosition = [3, 0.6, -2];
-    if (role === 'overseer') spawnPosition = [-2, 0.6, 4];
+    let spawnPosition = [0, 1.2, 0];
+    if (role === 'engineer') spawnPosition = [-3, 1.2, -2];
+    if (role === 'technician') spawnPosition = [3, 1.2, -2];
+    if (role === 'overseer') spawnPosition = [-2, 1.2, 4];
 
     room.players[socket.id] = {
       id: socket.id,

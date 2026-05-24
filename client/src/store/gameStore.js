@@ -11,9 +11,9 @@ export const useGameStore = create((set, get) => ({
   
   // Roles: 'engineer' (Player 1), 'technician' (Player 2), 'overseer' (Player 3)
   players: {
-    'player-1': { id: 'player-1', name: 'Engineer (P1)', role: 'engineer', position: [-3, 0.6, -2], rotation: 0, isReady: false },
-    'player-2': { id: 'player-2', name: 'Technician (P2)', role: 'technician', position: [3, 0.6, -2], rotation: 0, isReady: false },
-    'player-3': { id: 'player-3', name: 'Overseer (P3)', role: 'overseer', position: [-2, 0.6, 4], rotation: 0, isReady: false },
+    'player-1': { id: 'player-1', name: 'Engineer (P1)', role: 'engineer', position: [-3, 1.2, -2], rotation: 0, isReady: false },
+    'player-2': { id: 'player-2', name: 'Technician (P2)', role: 'technician', position: [3, 1.2, -2], rotation: 0, isReady: false },
+    'player-3': { id: 'player-3', name: 'Overseer (P3)', role: 'overseer', position: [-2, 1.2, 4], rotation: 0, isReady: false },
   },
 
   puzzleState: {
@@ -36,6 +36,10 @@ export const useGameStore = create((set, get) => ({
   
   updatePlayerPosition: (id, position, rotation) => set((state) => {
     if (!state.players[id]) return {};
+    // Guard against NaN coordinates to prevent camera-follow black holes (must be exactly 3 coordinates)
+    if (!position || position.length !== 3 || position.some(val => typeof val !== 'number' || isNaN(val))) {
+      return {};
+    }
     return {
       players: {
         ...state.players,
@@ -122,9 +126,9 @@ export const useGameStore = create((set, get) => ({
       solved: false
     },
     players: {
-      'player-1': { id: 'player-1', name: 'Engineer (P1)', role: 'engineer', position: [-3, 0.6, -2], rotation: 0, isReady: false },
-      'player-2': { id: 'player-2', name: 'Technician (P2)', role: 'technician', position: [3, 0.6, -2], rotation: 0, isReady: false },
-      'player-3': { id: 'player-3', name: 'Overseer (P3)', role: 'overseer', position: [-2, 0.6, 4], rotation: 0, isReady: false },
+      'player-1': { id: 'player-1', name: 'Engineer (P1)', role: 'engineer', position: [-3, 1.2, -2], rotation: 0, isReady: false },
+      'player-2': { id: 'player-2', name: 'Technician (P2)', role: 'technician', position: [3, 1.2, -2], rotation: 0, isReady: false },
+      'player-3': { id: 'player-3', name: 'Overseer (P3)', role: 'overseer', position: [-2, 1.2, 4], rotation: 0, isReady: false },
     }
   }))
 }));

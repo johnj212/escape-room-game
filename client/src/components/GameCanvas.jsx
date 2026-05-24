@@ -1,7 +1,8 @@
 import { useRef, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
-import { OrbitControls, AdaptiveDpr, AdaptiveEvents } from '@react-three/drei'
+import { OrbitControls, AdaptiveDpr, AdaptiveEvents, Environment } from '@react-three/drei'
+import { EffectComposer, Bloom, Vignette, ChromaticAberration } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { useGameStore } from '../store/gameStore'
 import { Room } from './Room'
@@ -51,37 +52,68 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
 
   return (
     <Canvas
-      shadows={!isMobile}
+      shadows={{ type: THREE.PCFSoftShadowMap }}
       dpr={isMobile ? [1, 1.2] : [1, 2]}
-      gl={{ antialias: !isMobile }}
+      gl={{
+        antialias: !isMobile,
+        toneMapping: THREE.ACESFilmicToneMapping,
+        toneMappingExposure: 1.2,
+      }}
       camera={{ position: [0, 5, 8], fov: 60 }}
     >
-      <color attach="background" args={['#06070a']} />
-      <fog attach="fog" args={['#06070a', 10, 25]} />
+      <color attach="background" args={['#05060a']} />
+      <fog attach="fog" args={['#05060a', 10, 25]} />
+      
+      {/* PBR reflection probe environment */}
+      <Environment preset="city" intensity={0.12} />
       
       {/* Dynamic Cyberpunk Lighting */}
-      <ambientLight intensity={0.2} color="#00f3ff" />
+      <ambientLight intensity={0.15} color="#00f3ff" />
       
       <directionalLight
         castShadow={!isMobile}
-        position={[5, 10, 5]}
-        intensity={1.2}
-        color="#ffffff"
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-        shadow-camera-far={30}
-        shadow-camera-left={-10}
-        shadow-camera-right={10}
-        shadow-camera-top={10}
-        shadow-camera-bottom={-10}
+        position={[8, 12, 6]}
+        intensity={1.0}
+        color="#c9d6ff"
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-far={40}
+        shadow-camera-left={-12}
+        shadow-camera-right={12}
+        shadow-camera-top={12}
+        shadow-camera-bottom={-12}
+        shadow-bias={-0.0005}
       />
       
       {/* Emissive reactor spot light */}
       <spotLight
-        position={[0, 8, 0]}
-        angle={Math.PI / 3}
-        penumbra={0.8}
-        intensity={3}
+        position={[0, 7.5, -9]}
+        angle={Math.PI / 2.5}
+        penumbra={0.9}
+        intensity={6}
+        distance={20}
+        decay={2}
+        color="#ff007f"
+        castShadow={!isMobile}
+        shadow-bias={-0.0002}
+      />
+
+      {/* Local lighting above the Engineer's Hologram Console */}
+      <pointLight
+        position={[-5, 1.6, 0]}
+        intensity={2.5}
+        distance={6}
+        decay={2}
+        color="#00f3ff"
+        castShadow={!isMobile}
+      />
+
+      {/* Local lighting above the Technician's Switch Board */}
+      <pointLight
+        position={[5, 1.6, 0]}
+        intensity={2.5}
+        distance={6}
+        decay={2}
         color="#ff007f"
         castShadow={!isMobile}
       />
@@ -104,6 +136,21 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
 
       <CameraFollow />
       
+      {/* Post-Processing Effects (Disabled on Mobile for performance) */}
+      {!isMobile && (
+        <EffectComposer>
+          <Bloom
+            luminanceThreshold={0.15}
+            luminanceSmoothing={0.7}
+            intensity={1.2}
+          />
+          <Vignette eskil={false} offset={0.2} darkness={1.05} />
+          <ChromaticAberration
+            offset={new THREE.Vector2(0.0008, 0.0008)}
+          />
+        </EffectComposer>
+      )}
+
       {/* Low-spec helpers to adapt performance */}
       <AdaptiveDpr pixelated />
       <AdaptiveEvents />

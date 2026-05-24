@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Monitor, Phone, Compass, Shield, User, Play, RefreshCw, Key, Power } from 'lucide-react'
 import nipplejs from 'nipplejs'
 import { useGameStore } from '../store/gameStore'
+import lobbyBg from '../assets/sector_9_deck_1779639466019.png'
 
 export const UIOverlays = ({ inputRef, joinRoom, createRoom, emitReady }) => {
   const gamePhase = useGameStore((state) => state.gamePhase)
@@ -113,7 +114,11 @@ export const UIOverlays = ({ inputRef, joinRoom, createRoom, emitReady }) => {
     const myPlayer = players[myPlayerId]
 
     return (
-      <div className="overlay-screen">
+      <div className="overlay-screen" style={{
+        backgroundImage: `linear-gradient(rgba(10, 11, 16, 0.7), rgba(5, 6, 10, 0.88)), url(${lobbyBg})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}>
         <h1 className="overlay-title">Sector-9 Command Deck</h1>
         <p className="overlay-subtitle">Cyberpunk Multi-operator Escape Grid</p>
 
@@ -350,7 +355,11 @@ export const UIOverlays = ({ inputRef, joinRoom, createRoom, emitReady }) => {
 
       {/* Game Over Screen (Win/Lose Modal) */}
       {(gamePhase === 'win' || gamePhase === 'lose') && (
-        <div className="overlay-screen">
+        <div className="overlay-screen" style={{
+          backgroundImage: `linear-gradient(rgba(10, 11, 16, 0.75), rgba(5, 6, 10, 0.9)), url(${lobbyBg})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}>
           <h1 className="overlay-title" style={{ color: gamePhase === 'win' ? '#39ff14' : '#ff3131' }}>
             {gamePhase === 'win' ? 'GRID SYNCHRONIZED' : 'REACTOR MELTDOWN'}
           </h1>

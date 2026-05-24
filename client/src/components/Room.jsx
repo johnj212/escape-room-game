@@ -1,56 +1,60 @@
+import { useMemo } from 'react'
 import { RigidBody } from '@react-three/rapier'
+import { ContactShadows } from '@react-three/drei'
 import * as THREE from 'three'
+import { generateFloorTextures, generateWallTextures, generateReactorTextures } from '../utils/textureGenerator'
 
 export const Room = () => {
-  // Create stylized procedural textures/materials for a high-fidelity cyberpunk aesthetic
-  
-  // Metallic plating for floor and terminals
-  const floorMaterial = new THREE.MeshStandardMaterial({
-    color: '#1a1d24',
-    roughness: 0.4,
-    metalness: 0.8,
-  })
+  // Memoize textures so they aren't generated/re-instantiated on every re-render
+  const floorTextures = useMemo(() => generateFloorTextures(), [])
+  const wallTextures = useMemo(() => generateWallTextures(), [])
+  const reactorTextures = useMemo(() => generateReactorTextures(), [])
 
-  const wallMaterial = new THREE.MeshStandardMaterial({
-    color: '#0f1115',
-    roughness: 0.5,
-    metalness: 0.9,
-  })
-
-  const neonBlueMaterial = new THREE.MeshStandardMaterial({
+  const neonBlueMaterial = useMemo(() => new THREE.MeshStandardMaterial({
     color: '#00f3ff',
     emissive: '#00f3ff',
-    emissiveIntensity: 1.5,
+    emissiveIntensity: 2.2,
     roughness: 0.1,
-  })
+  }), [])
 
-  const neonRedMaterial = new THREE.MeshStandardMaterial({
+  const neonRedMaterial = useMemo(() => new THREE.MeshStandardMaterial({
     color: '#ff007f',
     emissive: '#ff007f',
-    emissiveIntensity: 1.5,
+    emissiveIntensity: 2.2,
     roughness: 0.1,
-  })
+  }), [])
 
-  // Grid texture for floor
   return (
     <group>
       {/* 1. Floor (Static RigidBody) */}
       <RigidBody type="fixed" colliders="cuboid">
         <mesh receiveShadow position={[0, -0.1, 0]}>
           <boxGeometry args={[20, 0.2, 20]} />
-          <primitive object={floorMaterial} attach="material" />
+          <meshStandardMaterial 
+            {...floorTextures}
+            bumpScale={0.08}
+          />
         </mesh>
       </RigidBody>
 
+      {/* Contact Shadows for soft ambient occlusion underneath characters & props */}
+      <ContactShadows
+        position={[0, 0.015, 0]}
+        opacity={0.8}
+        scale={20}
+        blur={1.6}
+        far={3}
+      />
+
       {/* Decorative Floor Grid Lines */}
-      <gridHelper args={[20, 20, '#00f3ff', '#1f2533']} position={[0, 0.01, 0]} />
+      <gridHelper args={[20, 30, '#00f3ff', '#07090e']} position={[0, 0.01, 0]} />
 
       {/* 2. Walls (Static Colliders) */}
       {/* Back Wall */}
       <RigidBody type="fixed" colliders="cuboid">
         <mesh castShadow receiveShadow position={[0, 4, -10]}>
           <boxGeometry args={[20, 8, 0.5]} />
-          <primitive object={wallMaterial} attach="material" />
+          <meshStandardMaterial {...wallTextures} />
         </mesh>
       </RigidBody>
 
@@ -58,7 +62,7 @@ export const Room = () => {
       <RigidBody type="fixed" colliders="cuboid">
         <mesh castShadow receiveShadow position={[-10, 4, 0]} rotation={[0, Math.PI / 2, 0]}>
           <boxGeometry args={[20, 8, 0.5]} />
-          <primitive object={wallMaterial} attach="material" />
+          <meshStandardMaterial {...wallTextures} />
         </mesh>
       </RigidBody>
 
@@ -66,7 +70,7 @@ export const Room = () => {
       <RigidBody type="fixed" colliders="cuboid">
         <mesh castShadow receiveShadow position={[10, 4, 0]} rotation={[0, -Math.PI / 2, 0]}>
           <boxGeometry args={[20, 8, 0.5]} />
-          <primitive object={wallMaterial} attach="material" />
+          <meshStandardMaterial {...wallTextures} />
         </mesh>
       </RigidBody>
 
@@ -85,12 +89,15 @@ export const Room = () => {
           <meshPhysicalMaterial
             color="#00f3ff"
             emissive="#00f3ff"
-            emissiveIntensity={0.6}
+            emissiveIntensity={1.5}
             transparent
-            opacity={0.15}
-            roughness={0.1}
-            transmission={0.9} // Glass refraction
-            thickness={1}
+            opacity={0.18}
+            roughness={0.05}
+            metalness={0.1}
+            transmission={0.95} // High glass refraction
+            thickness={1.5}
+            clearcoat={1.0}
+            clearcoatRoughness={0.02}
           />
         </mesh>
         
@@ -108,8 +115,8 @@ export const Room = () => {
       {/* 4. Reactor Core Cylinder (Static decorative object at the back center) */}
       <RigidBody type="fixed" colliders="cuboid">
         <mesh castShadow position={[0, 4, -9]} rotation={[0, 0, 0]}>
-          <cylinderGeometry args={[1.5, 1.5, 8, 16]} />
-          <primitive object={wallMaterial} attach="material" />
+          <cylinderGeometry args={[1.5, 1.5, 8, 32]} />
+          <meshStandardMaterial {...reactorTextures} />
         </mesh>
         {/* Glow Core */}
         <mesh position={[0, 4, -7.4]}>
@@ -120,16 +127,26 @@ export const Room = () => {
 
       {/* Ceiling decorative piping / trusses */}
       <mesh position={[0, 7.8, 0]}>
-        <boxGeometry args={[20, 0.2, 0.5]} />
-        <primitive object={wallMaterial} attach="material" />
+        <boxGeometry args={[20, 0.2, 0.6]} />
+        <meshStandardMaterial {...wallTextures} />
       </mesh>
       <mesh position={[0, 7.8, -5]}>
-        <boxGeometry args={[20, 0.2, 0.5]} />
-        <primitive object={wallMaterial} attach="material" />
+        <boxGeometry args={[20, 0.2, 0.6]} />
+        <meshStandardMaterial {...wallTextures} />
       </mesh>
       <mesh position={[0, 7.8, 5]}>
-        <boxGeometry args={[20, 0.2, 0.5]} />
-        <primitive object={wallMaterial} attach="material" />
+        <boxGeometry args={[20, 0.2, 0.6]} />
+        <meshStandardMaterial {...wallTextures} />
+      </mesh>
+
+      {/* Neon ceiling lighting conduits running along the beams */}
+      <mesh position={[0, 7.68, -4.9]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.03, 0.03, 20, 8]} />
+        <primitive object={neonBlueMaterial} attach="material" />
+      </mesh>
+      <mesh position={[0, 7.68, 4.9]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.03, 0.03, 20, 8]} />
+        <primitive object={neonBlueMaterial} attach="material" />
       </mesh>
     </group>
   )

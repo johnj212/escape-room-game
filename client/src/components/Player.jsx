@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CapsuleCollider } from '@react-three/rapier'
 import { Html } from '@react-three/drei'
@@ -13,6 +13,7 @@ export const Player = ({ id, playerInfo, inputRef, emitMovement }) => {
   
   const rbRef = useRef(null)
   const meshRef = useRef(null)
+  const droidRef = useRef(null)
   
   const isActive = activePlayerId === id
   // In multiplayer, you only control your own player. In solo, you control the active swap player.
@@ -117,6 +118,25 @@ export const Player = ({ id, playerInfo, inputRef, emitMovement }) => {
         )
       }
     }
+
+    // Floating bobbing and stabilizer rotation inside the droid group
+    if (droidRef.current) {
+      const elapsed = state.clock.getElapsedTime()
+      // Unique frequency/phase offset per droid based on role name
+      const phaseOffset = id.charCodeAt(0)
+      droidRef.current.position.y = Math.sin(elapsed * 2.5 + phaseOffset) * 0.05
+      
+      const stabilizer = droidRef.current.getObjectByName('stabilizer')
+      if (stabilizer) {
+        stabilizer.rotation.z = elapsed * 1.5
+      }
+
+      // Slightly flicker engine nozzle light
+      const engineLight = droidRef.current.getObjectByName('engineLight')
+      if (engineLight) {
+        engineLight.intensity = (isControlling ? 2.0 : 1.0) + Math.sin(elapsed * 12) * 0.3
+      }
+    }
   })
 
   return (
@@ -130,27 +150,98 @@ export const Player = ({ id, playerInfo, inputRef, emitMovement }) => {
       <CapsuleCollider args={[0.3, 0.3]} />
       
       <group ref={meshRef}>
-        {/* Futuristic capsule mesh representation of player */}
-        <mesh castShadow position={[0, 0, 0]}>
-          <capsuleGeometry args={[0.3, 0.6, 8, 16]} />
-          <meshStandardMaterial
+        <group ref={droidRef}>
+          {/* Central Mech Sphere Core */}
+          <mesh castShadow receiveShadow position={[0, 0.2, 0]}>
+            <sphereGeometry args={[0.22, 16, 16]} />
+            <meshStandardMaterial
+              color="#0d0e12"
+              roughness={0.35}
+              metalness={0.9}
+            />
+          </mesh>
+
+          {/* Curved Outer Stabilizer Ring (spinning) */}
+          <mesh name="stabilizer" castShadow position={[0, 0.2, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.27, 0.03, 8, 24]} />
+            <meshStandardMaterial
+              color="#3a4050"
+              roughness={0.15}
+              metalness={0.95}
+            />
+          </mesh>
+
+          {/* Role Color Visor / Camera Lens */}
+          <mesh position={[0, 0.22, 0.17]}>
+            <sphereGeometry args={[0.07, 16, 16]} />
+            <meshStandardMaterial
+              color={color}
+              emissive={color}
+              emissiveIntensity={2.5}
+              roughness={0.1}
+            />
+          </mesh>
+          
+          {/* Lens Shield Visor Hood */}
+          <mesh position={[0, 0.25, 0.11]} rotation={[Math.PI / 6, 0, 0]}>
+            <boxGeometry args={[0.2, 0.08, 0.12]} />
+            <meshStandardMaterial
+              color="#1a1c24"
+              roughness={0.4}
+              metalness={0.85}
+            />
+          </mesh>
+
+          {/* Jet Thruster base */}
+          <mesh castShadow position={[0, 0.02, 0]}>
+            <cylinderGeometry args={[0.07, 0.04, 0.1, 8]} />
+            <meshStandardMaterial 
+              color="#2a303f" 
+              roughness={0.4} 
+              metalness={0.9} 
+            />
+          </mesh>
+
+          {/* Glowing Jet Engine flame plume */}
+          <mesh position={[0, -0.06, 0]} rotation={[Math.PI, 0, 0]}>
+            <coneGeometry args={[0.045, 0.15, 8]} />
+            <meshBasicMaterial
+              color={color}
+              transparent
+              opacity={0.65}
+            />
+          </mesh>
+
+          {/* Side Thrusters */}
+          <group position={[-0.3, 0.2, 0]}>
+            <mesh castShadow rotation={[0, 0, -Math.PI / 10]}>
+              <cylinderGeometry args={[0.015, 0.025, 0.08, 8]} />
+              <meshStandardMaterial color="#1a1c24" roughness={0.3} metalness={0.8} />
+            </mesh>
+          </group>
+          <group position={[0.3, 0.2, 0]}>
+            <mesh castShadow rotation={[0, 0, Math.PI / 10]}>
+              <cylinderGeometry args={[0.015, 0.025, 0.08, 8]} />
+              <meshStandardMaterial color="#1a1c24" roughness={0.3} metalness={0.8} />
+            </mesh>
+          </group>
+
+          {/* Cyber Antenna */}
+          <mesh castShadow position={[-0.08, 0.4, -0.08]} rotation={[Math.PI / 6, 0, -Math.PI / 12]}>
+            <cylinderGeometry args={[0.005, 0.005, 0.22, 6]} />
+            <meshStandardMaterial color="#0b0d10" roughness={0.2} metalness={0.9} />
+          </mesh>
+
+          {/* Dynamic local lighting reflecting hover plasma */}
+          <pointLight
+            name="engineLight"
+            position={[0, -0.2, 0]}
+            intensity={isControlling ? 1.8 : 0.8}
+            distance={2.5}
+            decay={2}
             color={color}
-            roughness={0.2}
-            metalness={0.8}
-            emissive={isControlling ? color : '#000000'}
-            emissiveIntensity={0.2}
           />
-        </mesh>
-        
-        {/* Glow Ring visor */}
-        <mesh position={[0, 0.4, 0.15]}>
-          <boxGeometry args={[0.35, 0.1, 0.1]} />
-          <meshStandardMaterial
-            color={color}
-            emissive={color}
-            emissiveIntensity={1.5}
-          />
-        </mesh>
+        </group>
         
         {/* Status indicator tag */}
         <Html distanceFactor={6} position={[0, 1.2, 0]} center>
