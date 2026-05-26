@@ -137,12 +137,19 @@ export const useMultiplayer = () => {
     }
   }
 
+  const emitResetGame = () => {
+    if (socket && !isSolo) {
+      socket.emit('reset-game')
+    }
+  }
+
   return {
     joinRoom,
     createRoom,
     emitMovement,
     emitToggleSwitch,
     emitReady,
+    emitResetGame,
     socket
   }
 }

@@ -14,7 +14,7 @@ export default function App() {
   const inputRef = usePlayerControls()
 
   // Initialize Socket.io connection (automatically manages connection based on solo state)
-  const { joinRoom, createRoom, emitMovement, emitReady } = useMultiplayer()
+  const { joinRoom, createRoom, emitMovement, emitReady, emitResetGame } = useMultiplayer()
 
   // Manage Game Tick countdown timer on client
   useEffect(() => {
@@ -44,6 +44,7 @@ export default function App() {
         joinRoom={joinRoom}
         createRoom={createRoom}
         emitReady={emitReady}
+        emitResetGame={emitResetGame}
       />
     </div>
   )

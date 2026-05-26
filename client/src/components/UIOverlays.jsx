@@ -4,7 +4,7 @@ import nipplejs from 'nipplejs'
 import { useGameStore } from '../store/gameStore'
 import lobbyBg from '../assets/sector_9_deck_1779639466019.png'
 
-export const UIOverlays = ({ inputRef, joinRoom, createRoom, emitReady }) => {
+export const UIOverlays = ({ inputRef, joinRoom, createRoom, emitReady, emitResetGame }) => {
   const gamePhase = useGameStore((state) => state.gamePhase)
   const roomId = useGameStore((state) => state.roomId)
   const players = useGameStore((state) => state.players)
@@ -369,7 +369,13 @@ export const UIOverlays = ({ inputRef, joinRoom, createRoom, emitReady }) => {
               : 'Core failure critical. Escape pod launch systems offline.'}
           </p>
           <div className="glass-panel" style={{ width: '320px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <button className="cyber-button" onClick={resetGame}>
+            <button className="cyber-button" onClick={() => {
+              if (isSolo) {
+                resetGame()
+              } else {
+                emitResetGame()
+              }
+            }}>
               <RefreshCw size={16} />
               Re-Initialize System
             </button>

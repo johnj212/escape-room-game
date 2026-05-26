@@ -84,11 +84,40 @@ const updatePlayerReady = (roomId, socketId) => {
   ioRef.to(roomId).emit('room-state', room);
 };
 
+const resetRoom = (roomId) => {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  room.phase = 'lobby';
+  room.timer = 900;
+  room.tickCounter = 0;
+  room.puzzleState = puzzleEngine.createPuzzleState();
+  
+  // Reset all players to unready and default spawn positions
+  Object.keys(room.players).forEach((socketId) => {
+    const player = room.players[socketId];
+    player.isReady = false;
+    
+    let spawnPosition = [0, 1.2, 0];
+    if (player.role === 'engineer') spawnPosition = [-3, 1.2, -2];
+    if (player.role === 'technician') spawnPosition = [3, 1.2, -2];
+    if (player.role === 'overseer') spawnPosition = [-2, 1.2, 4];
+    
+    player.position = spawnPosition;
+    player.rotation = 0;
+  });
+
+  if (ioRef) {
+    ioRef.to(roomId).emit('room-state', room);
+  }
+};
+
 module.exports = {
   initGameLoop,
   getRoom,
   createRoom,
   deleteRoom,
   updatePlayerReady,
+  resetRoom,
   rooms
 };

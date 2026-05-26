@@ -149,6 +149,11 @@ io.on('connection', (socket) => {
     gameLoop.updatePlayerReady(currentRoomId, socket.id);
   });
 
+  socket.on('reset-game', () => {
+    if (!currentRoomId) return;
+    gameLoop.resetRoom(currentRoomId);
+  });
+
   socket.on('toggle-switch', ({ color }) => {
     if (!currentRoomId) return;
     const room = gameLoop.getRoom(currentRoomId);

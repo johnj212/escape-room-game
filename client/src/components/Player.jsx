@@ -30,6 +30,16 @@ export const Player = ({ id, playerInfo, inputRef, emitMovement }) => {
   }
   const color = getRoleColor(playerInfo.role)
 
+  // Get default role spawn positions for rescue snap
+  const getSpawnPosition = (role) => {
+    switch (role) {
+      case 'engineer': return [-3, 1.2, -2]
+      case 'technician': return [3, 1.2, -2]
+      case 'overseer': return [-2, 1.2, 4]
+      default: return [0, 1.2, 0]
+    }
+  }
+
   // Sync initial position
   useEffect(() => {
     if (rbRef.current && playerInfo.position) {
@@ -87,11 +97,21 @@ export const Player = ({ id, playerInfo, inputRef, emitMovement }) => {
       const rotation = meshRef.current ? meshRef.current.rotation.y : 0
       
       if (translation && !isNaN(translation.x) && !isNaN(translation.y) && !isNaN(translation.z)) {
-        const newPos = [translation.x, translation.y, translation.z]
-        updatePlayerPosition(id, newPos, rotation)
-        
-        // Emit to server
-        emitMovement(newPos, rotation)
+        // Safety Fall Rescue: If player clips below floor (Y < -1.0), snap back to spawn
+        if (translation.y < -1.0) {
+          console.warn(`[Player] ${playerInfo.name} fell through floor (Y: ${translation.y}). Rescuing...`)
+          const spawnPos = getSpawnPosition(playerInfo.role)
+          rbRef.current.setTranslation({ x: spawnPos[0], y: spawnPos[1], z: spawnPos[2] }, true)
+          rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
+          updatePlayerPosition(id, spawnPos, rotation)
+          emitMovement(spawnPos, rotation)
+        } else {
+          const newPos = [translation.x, translation.y, translation.z]
+          updatePlayerPosition(id, newPos, rotation)
+          
+          // Emit to server
+          emitMovement(newPos, rotation)
+        }
       }
     } else {
       // Remote player or inactive player (in solo mode) - smoothly lerp position
