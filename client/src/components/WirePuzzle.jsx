@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useMemo } from 'react'
-import { RigidBody, CuboidCollider } from '@react-three/rapier'
+import { RigidBody } from '@react-three/rapier'
 import { Html } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -39,7 +39,7 @@ export const WirePuzzle = () => {
     const activePlayer = players[activePlayerId]
     if (!activePlayer || !activePlayer.position) return
 
-    const [px, py, pz] = activePlayer.position
+    const [px, , pz] = activePlayer.position
     // Terminal position: [5, 0.5, 0]
     const distance = Math.sqrt((px - 5) ** 2 + (pz - 0) ** 2)
     

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'react'
+import { useRef, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CapsuleCollider } from '@react-three/rapier'
 import { Html } from '@react-three/drei'
@@ -40,12 +40,15 @@ export const Player = ({ id, playerInfo, inputRef, emitMovement }) => {
     }
   }
 
-  // Sync initial position
+  // Sync initial position — mount-only: seeds the rigid body from the spawn
+  // position once the ref is live. Re-running on playerInfo.position would
+  // fight the physics sim / prediction, so it is deliberately excluded.
   useEffect(() => {
     if (rbRef.current && playerInfo.position) {
       const [x, y, z] = playerInfo.position
       rbRef.current.setTranslation({ x, y, z }, true)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rbRef])
 
   useFrame((state, delta) => {

@@ -51,11 +51,11 @@ Recorded 2026-07-04 via `node tools/perf-probe.mjs --mode record --profile deskt
 
 | Metric | Value |
 | --- | --- |
-| fps (median) | 27 |
+| fps (median) | 18 |
 | drawCalls (median) | 1 |
 | triangles (median) | 2 |
 | samples | 29 |
-| JS+CSS gzip, client/dist, excl. .wasm | 1081.5 KB (1107490 bytes) |
+| JS+CSS gzip, client/dist, excl. .wasm | 1081.5 KB (1107457 bytes) |
 
 _Phase 0 records the current WebGL numbers only — not compared against the WebGPU floors in `Project_Requirements.md` §2 (desktop >=60fps/>=2M tris/<=500KB gzip, mobile >=30fps/>=0.5M tris). `perf-probe.mjs --mode assert` enforces those floors from Phase 1 onward._
 ## Next actions

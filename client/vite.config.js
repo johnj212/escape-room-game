@@ -7,5 +7,10 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true
+  },
+  test: {
+    // Vitest runs unit tests only; Playwright owns e2e/ (its test.describe
+    // is incompatible with the vitest runner). See STATUS.md.
+    exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**']
   }
 })

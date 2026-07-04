@@ -1,7 +1,7 @@
-import { useRef, useEffect } from 'react'
+import { useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
-import { OrbitControls, AdaptiveDpr, AdaptiveEvents, Environment } from '@react-three/drei'
+import { AdaptiveDpr, AdaptiveEvents, Environment } from '@react-three/drei'
 import { EffectComposer, Bloom, Vignette, ChromaticAberration } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { useGameStore } from '../store/gameStore'
@@ -75,9 +75,7 @@ const CameraFollow = () => {
 
 export const GameCanvas = ({ inputRef, emitMovement }) => {
   const players = useGameStore((state) => state.players)
-  const isSolo = useGameStore((state) => state.isSolo)
-  const myPlayerId = useGameStore((state) => state.myPlayerId)
-  
+
   // Detect mobile
   const isMobile = /Mobi|Android/i.test(navigator.userAgent)
 

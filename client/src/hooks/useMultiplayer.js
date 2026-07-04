@@ -82,11 +82,11 @@ export const useMultiplayer = () => {
       showToast(`Joined room: ${roomId}`)
     })
 
-    socket.on('player-joined', ({ id, name, role }) => {
+    socket.on('player-joined', ({ name, role }) => {
       showToast(`${name} joined as ${role}`)
     })
 
-    socket.on('player-left', ({ id, name }) => {
+    socket.on('player-left', ({ name }) => {
       showToast(`${name} left the room`)
     })
 
@@ -100,6 +100,10 @@ export const useMultiplayer = () => {
         socket = null
       }
     }
+    // Mount-only socket wiring, re-run only when solo/multiplayer mode flips.
+    // The zustand setters and showToast are stable references, so listing them
+    // would not change behaviour — only add churn. Deliberately excluded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSolo])
 
   const joinRoom = (roomId, name, role) => {

@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
-import { Monitor, Phone, Compass, Shield, User, Play, RefreshCw, Key, Power } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Monitor, Compass, Shield, RefreshCw, Power } from 'lucide-react'
 import nipplejs from 'nipplejs'
 import { useGameStore } from '../store/gameStore'
 import lobbyBg from '../assets/sector_9_deck_1779639466019.png'
 
-export const UIOverlays = ({ inputRef, joinRoom, createRoom, emitReady, emitResetGame }) => {
+export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) => {
   const gamePhase = useGameStore((state) => state.gamePhase)
   const roomId = useGameStore((state) => state.roomId)
   const players = useGameStore((state) => state.players)

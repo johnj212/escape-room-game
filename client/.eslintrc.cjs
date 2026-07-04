@@ -32,5 +32,15 @@ module.exports = {
     // not suppress any of the real checks below (unused vars, prop-types,
     // hooks deps, etc.).
     'react/no-unknown-property': 'off',
+    // This is a plain-JSX codebase (no TypeScript) whose components are all
+    // internal to the app — none are a published API consumed by third parties.
+    // prop-types would be runtime dev-only validation the project never adopted;
+    // requiring a propTypes block on every internal <Player>/<WirePuzzle>/overlay
+    // component adds boilerplate without catching real defects (the props flow
+    // from a single known caller). The type-safety story for this codebase is the
+    // Phase-1 migration path, not prop-types. Disabled deliberately, matching the
+    // standard guidance for non-TS React apps; genuine checks (unused vars, hooks
+    // deps) stay on.
+    'react/prop-types': 'off',
   },
 }

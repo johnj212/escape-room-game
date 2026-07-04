@@ -66,7 +66,6 @@ export const useGameStore = create((set, get) => ({
     // Evaluate solution locally for solo mode
     let solved = false;
     if (state.isSolo) {
-      const activeSwitches = Object.keys(currentSwitches).filter(c => currentSwitches[c]);
       const cipher = state.puzzleState.cipher;
       
       // If we turned on EXACTLY the ones in the cipher, and in the correct count/order

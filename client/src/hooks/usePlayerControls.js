@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import { useGameStore } from '../store/gameStore'
 
 export const usePlayerControls = () => {
-  const activePlayerId = useGameStore((state) => state.activePlayerId)
   const setActivePlayer = useGameStore((state) => state.setActivePlayer)
   const isSolo = useGameStore((state) => state.isSolo)
   
