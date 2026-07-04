@@ -65,51 +65,55 @@ graph LR
     GameLoop -->|Broadcasts state deltas| SocketClient
 ```
 
-### 1. 3D Engine: **React Three Fiber (R3F)** & `@react-three/drei`
-- **Why**: React Three Fiber allows us to compose Three.js elements declaratively as React components. `@react-three/drei` provides pre-built helpers (like keyboard controls, custom collision boundaries, gltf loaders, lights, and responsive canvases) which accelerate game dev.
-- **Aesthetic Goals**: We will design a premium cyberpunk environment using glowing emissive neon materials, metallic panel textures, dynamic shadows, and high-tech UI overlays (glassmorphism panels).
+### 1. 3D Engine & Procedural Asset-Free Design: **React Three Fiber (R3F)**
+- **Why**: React Three Fiber allows us to compose Three.js elements declaratively.
+- **Procedural Mesh Architecture**: Rather than loading heavy external `.glb` models (which can break, fail to load, or slow down initial mobile rendering), we will build the cyberpunk Sector-9 Command Deck **procedurally** using Three.js primitive geometries (`<boxGeometry>`, `<cylinderGeometry>`, `<torusGeometry>`, etc.).
+  - Walls and doors will be styled with dark metallic textures generated via canvas-backed shaders or CSS grids.
+  - Interactive nodes, lasers, and holographic ciphers will use rich neon emissive materials (`MeshStandardMaterial` with high `emissive` values and intensity).
+  - This guarantees **instant loads** (<20KB of code instead of >5MB of assets) and robust local testing.
 
-### 2. Physics: **@react-three/rapier** (Rapier3D via WASM)
-- **Why**: Required for player collision with walls/objects, Puzzle 3's laser raycasting and mirror rotation physics, and scanner proximity detection for Puzzle 2.
-- **Strategy**:
-  - All static room geometry (walls, floor, furniture) uses `RigidBody type="fixed"` with simplified box/hull colliders.
-  - Player avatars use `RigidBody type="dynamic"` with capsule colliders.
-  - Puzzle interactables use sensor colliders for proximity triggers (e.g., hand scanner activation zones).
-  - Fixed physics timestep (33ms) to match server tick rate for deterministic behavior.
+### 2. Physics & Collisions: **Lightweight Custom AABB System**
+- **Why**: Rapier3D is powerful but requires a heavy WebAssembly (WASM) bundle (>1.5MB) which increases load times and can fail on older mobile browsers.
+- **Alternative**: We will implement a lightweight, custom **Axis-Aligned Bounding Box (AABB) and Cylinder-based collision system** in pure JS:
+  - Static obstacles (walls, control tables, consoles) are defined as simple rectangular boxes.
+  - Player avatars are represented as cylinders (position `(x, z)` and radius `r`).
+  - Movement checks: Before moving the active player, we test if the new position overlaps any bounding boxes and slide the player along the collision plane (providing smooth movement).
+  - Trigger zones (hand scanners, wire terminal) are represented as simple radial sensors (e.g. `distance < 2.0`).
+  - This eliminates WASM dependencies entirely, decreases package overhead, and runs at a lockstep 60 FPS even on low-end devices.
 
-### 3. Networking: **Socket.io** (with Node.js server)
-- **Why**: Low latency, built-in support for rooms (multiple lobby instances), and robust fallback to long-polling if WebSockets are blocked. For a 3-player cooperative puzzle game, TCP latency is acceptable — head-of-line blocking is negligible at this scale.
-- **Server Authority**: The server will act as the source of truth for:
-  - Lobby management (exactly 3 players per room).
-  - Puzzle states (which wires are cut, whether a button is active, reactor status).
-  - Player coordination updates.
-  - Countdown timer.
-- **Client-Side Prediction**: Player movement is predicted locally and reconciled against server state to avoid "sluggish" controls over the ~50–100ms TCP round-trip.
-- **Reconnection & Resilience**:
-  - 30-second grace period on disconnect — the player's slot is held.
-  - On reconnect, the server sends a full state snapshot.
-  - Other players see a "Player X reconnecting..." indicator.
-  - Solo mode persists game state to `localStorage` for resume-on-refresh.
-- **Anti-Cheat / Validation**:
-  - Server validates movement speed (max velocity check, teleport detection).
-  - Rate-limit socket events (max 60 inputs/sec per client).
-  - Puzzle solve conditions validated server-side before broadcasting.
+### 3. Networking & Local-First Fallback: **Socket.io** + **Local Store Controller**
+- **Why**: Low-latency multiplayer sync with a fallback to a standalone local play experience.
+- **Local-First Architecture**:
+  - The client will run in two modes: `local` (offline/sandbox) and `online` (multiplayer lobby).
+  - In `local` mode, all state updates, puzzle evaluations, and character switching occur directly in the local Zustand store (simulating the server). This allows the game to be fully playable offline.
+  - In `online` mode, the local store connects via `socket.io-client` to the server. Inputs are emitted to the server, and the server runs the game loop, returning authoritative player states and puzzle progress.
+- **Server Authority**: The server validates coordinates, decrements the game timer, and manages room lobbies (exactly 3 slots per room code).
+- **Client Prediction**: Local player movements are predicted instantly on-screen and corrected when the server broadcasts updates.
 
 ### 4. State Management: **Zustand**
-- **Why**: R3F apps that manage game state through `useState` or prop drilling suffer severe re-render performance issues. Zustand provides direct ref-based subscriptions with no re-renders, works seamlessly with `useFrame()`, and has minimal boilerplate.
+- **Why**: R3F apps that manage game state through React state suffer severe re-render performance issues. Zustand provides direct ref-based subscriptions with no re-renders, works seamlessly with R3F's `useFrame()` hook, and has minimal boilerplate.
 - **Store shape**:
   ```js
   useGameStore = create((set) => ({
-    players: {},          // { id: { position, rotation, avatar } }
-    puzzleStates: {},     // { puzzleId: { solved, progress, data } }
-    activePlayerId: null, // For character swapping
+    mode: 'local',        // 'local' | 'online'
+    roomCode: null,       // Multiplayer room identifier
+    players: {
+      player1: { id: 'player1', name: 'Engineer', position: [0, 0, 0], rotation: 0, color: '#ff007f' },
+      player2: { id: 'player2', name: 'Technician', position: [-3, 0, -3], rotation: 0, color: '#00f0ff' },
+      player3: { id: 'player3', name: 'Overseer', position: [3, 0, -3], rotation: 0, color: '#39ff14' },
+    },
+    activePlayerId: 'player1', // For character swapping ('player1' | 'player2' | 'player3')
+    puzzleStates: {
+      wires: { solved: false, sequence: ['Red', 'Blue', 'Green'], activeSequence: [] },
+      scanners: { solved: false, activeCount: 0, lastActivated: {} },
+      laser: { solved: false, mirrorAngle: 0, emitterAngle: 0 },
+    },
     gamePhase: 'lobby',   // lobby | playing | escaped | failed
-    timer: 900,           // 15 minutes in seconds, server-authoritative
-    settings: {           // User preferences
+    timer: 900,           // 15 minutes countdown (seconds)
+    settings: {
       colorblindMode: false,
       reducedMotion: false,
-      audioVolume: 0.7,
-    },
+    }
   }))
   ```
 
@@ -117,59 +121,19 @@ graph LR
 - **Why**: In accordance with the system styling guidelines, we will use modern Vanilla CSS with CSS custom properties (variables) for HSL colors, responsive grid structures, blur effects (glassmorphism), and keyframe animations for UI transitions.
 - Supports `prefers-reduced-motion` media query to disable animations for users who request it.
 
-### 6. Audio: **Drei Positional Audio** + **Howler.js**
-- **3D Spatial Audio** (`@react-three/drei` `<PositionalAudio>`): Reactor hum, laser buzz, scanner beeps — positioned in 3D space and attenuated by distance.
-- **UI Audio** (`howler.js`): Menu clicks, countdown tick, puzzle-solve chime, alarm klaxon, game-over explosion.
-- **Progressive Intensity**: As the countdown timer drops below 5 minutes, ambient alarm frequency increases and lights begin flickering.
+### 6. Audio: **Web Audio API + Procedural Sound Synthesis**
+- **Why**: Loading multiple `.mp3` or `.wav` sound files increases load times and can hit CORS or blocking issues.
+- **Alternative**: We will use a lightweight custom Web Audio synthesis utility to generate retro-futuristic sound effects procedurally:
+  - **Alarm Klaxon**: Alternating low and high square waves.
+  - **Laser Hum**: Constant low-frequency triangle wave with a slight filter sweep.
+  - **Button Click / Chime**: High frequency sine wave with rapid exponential decay.
+  - **Meltdown Explosion**: White noise generator with a lowpass filter sweep.
+  - This guarantees zero audio files to download while delivering a highly responsive, custom auditory feedback system.
 
 ### 7. Mobile Web Strategy
-
-#### Touch Controls
-- **Movement**: `nipplejs` virtual joystick (HTML/CSS overlay, left side of screen).
-- **Camera**: Second virtual joystick (right side) or drag-on-canvas.
-- **Interaction**: Tap on 3D objects to interact (replaces click). Large "ACTIVATE" button appears contextually near interactable objects.
-- **Character Swap**: Three large buttons at bottom-center of screen.
-
-#### Puzzle-Specific Mobile Adaptations
-
-| Puzzle | Mobile Solution |
-| :--- | :--- |
-| **1. Wire Grid** | When approaching the terminal, an HTML overlay panel with large toggle switches appears (avoids tiny 3D touch targets). |
-| **2. Hand Scanners** | Virtual joystick for movement + contextual "SCAN" button when in proximity. |
-| **3. Laser/Mirrors** | Mode toggle: "Move" vs "Interact". In interact mode, drag gestures rotate mirrors. |
-
-#### Adaptive Rendering Quality
-Detect device capability and adjust rendering to maintain 30–60 FPS:
-
-```js
-const isMobile = /Mobi|Android/i.test(navigator.userAgent)
-// Also use detect-gpu library for GPU tier detection
-
-<Canvas
-  dpr={isMobile ? [1, 1.5] : [1, 2]}       // Cap pixel ratio
-  shadows={!isMobile}                        // Disable real-time shadows on mobile
-  gl={{ antialias: !isMobile }}              // Disable AA on mobile
-/>
-```
-
-- **Desktop**: Full shadows, bloom post-processing, antialiasing, DPR up to 2.
-- **Mobile**: Baked shadow textures, no bloom, no AA, DPR capped at 1.5.
-- Use `<AdaptiveDpr />` and `<AdaptiveEvents />` from Drei for auto-tuning.
-
-#### Viewport & Orientation
-- Lock to landscape orientation on Android (`screen.orientation.lock('landscape')`).
-- Show "Please rotate your device" overlay in portrait mode (iOS graceful fallback).
-- Ensure UI overlays (chat, timer, puzzle hints) don't overlap touch control areas.
-
-### 8. Asset Pipeline
-
-| Concern | Solution |
-| :--- | :--- |
-| **3D Models** | `.glb` (binary glTF) format — universal, compact, GPU-friendly |
-| **Compression** | Draco or Meshopt via `gltf-transform` CLI before bundling |
-| **Textures** | KTX2/Basis Universal for GPU-compressed textures; cap at 1K–2K on mobile |
-| **Loading UX** | `<Suspense>` + `useProgress()` from Drei → custom loading screen with progress bar |
-| **Memory** | Call `.dispose()` on geometries/materials/textures when unloading; monitor via `renderer.info` |
+- **Touch Controls**: Left screen side is dedicated to a virtual trackpad/joystick for character translation. Right screen side is dedicated to horizontal look controls (yaw rotation).
+- **Adaptive Quality**: Auto-detects device capabilities and caps pixel ratio, disables anti-aliasing, and lowers dynamic lighting to maintain a stable 60 FPS on mobile.
+- **Landscape Prompt**: Auto-lock screen interface in landscape orientation with CSS media queries. If the screen width is smaller than height, display a gorgeous custom full-screen dialog requesting the user to rotate their phone.
 
 ---
 
@@ -180,19 +144,17 @@ We will create a monorepo setup containing both client and server inside the wor
 ```text
 /escape-room-game
 ├── /client                     # React + Three.js client
-│   ├── /public
-│   │   └── /models             # Compressed .glb models and KTX2 textures
 │   ├── /src
 │   │   ├── /components
-│   │   │   ├── GameCanvas.jsx        # R3F canvas, lights, physics world, adaptive quality
-│   │   │   ├── Room.jsx              # 3D room geometry, walls, floor, furniture
-│   │   │   ├── Player.jsx            # Avatar with Rapier rigid body, movement, tag name
-│   │   │   ├── PuzzleTerminal.jsx    # Wire board, scanner, and mirror interactables
+│   │   │   ├── GameCanvas.jsx        # R3F canvas, lights, custom collision loop, adaptive quality
+│   │   │   ├── Room.jsx              # 3D room geometry generated procedurally using primitives
+│   │   │   ├── Player.jsx            # Avatar with custom AABB cylinder collision, movement, name tag
+│   │   │   ├── PuzzleTerminal.jsx    # Wire board, scanner, and mirror interactables (proximity checks)
 │   │   │   ├── LaserBeam.jsx         # Raycasted laser with mirror reflections
-│   │   │   ├── MobileControls.jsx    # nipplejs joysticks + contextual action buttons
+│   │   │   ├── MobileControls.jsx    # Virtual trackpads + contextual action buttons
 │   │   │   ├── HUD.jsx               # Timer, player names, puzzle progress indicators
 │   │   │   ├── LobbyScreen.jsx       # Room code entry, player list, ready-up
-│   │   │   ├── LoadingScreen.jsx     # Asset loading progress bar
+│   │   │   ├── LoadingScreen.jsx     # Asset loading progress bar (procedural assets)
 │   │   │   └── GameOverScreen.jsx    # Win/lose states with replay option
 │   │   ├── /hooks
 │   │   │   ├── useMultiplayer.js     # Socket.io connection, reconnection, state sync
@@ -200,6 +162,8 @@ We will create a monorepo setup containing both client and server inside the wor
 │   │   ├── /store
 │   │   │   └── gameStore.js          # Zustand store (players, puzzles, timer, settings)
 │   │   ├── /utils
+│   │   │   ├── physics.js            # Custom lightweight collision checking (AABB/Cylinder)
+│   │   │   ├── sound.js              # Procedural Web Audio API sound generator
 │   │   │   └── adaptiveQuality.js    # Device detection, GPU tier, render quality config
 │   │   ├── App.jsx                   # Main game setup, routing between screens
 │   │   ├── index.css                 # Design tokens, typography, glassmorphism CSS
@@ -227,6 +191,12 @@ Design tokens for colors, neon effects, UI overlay fonts (Orbitron/Inter), and p
 #### [NEW] [client/src/store/gameStore.js](file:///Users/johnmather/coding/Anti/escape%20room%20game/client/src/store/gameStore.js)
 Zustand store managing all client-side game state: player positions, puzzle progress, countdown timer, active character ID, game phase, and user settings (colorblind mode, reduced motion, audio volume).
 
+#### [NEW] [client/src/utils/physics.js](file:///Users/johnmather/coding/Anti/escape%20room%20game/client/src/utils/physics.js)
+Pure JavaScript implementation of cylinder-vs-AABB (Axis-Aligned Bounding Box) collisions. Exports dynamic collision boundary functions that determine whether a player capsule can move to a target coordinate, and returns sliding vectors when hitting walls or props.
+
+#### [NEW] [client/src/utils/sound.js](file:///Users/johnmather/coding/Anti/escape%20room%20game/client/src/utils/sound.js)
+Procedural audio synthesizer utilizing the Web Audio API. Generates sci-fi hums, scanner sweeps, wiring crackles, ticking down clocks, and explosion effects on-the-fly, requiring zero asset files.
+
 #### [NEW] [client/src/utils/adaptiveQuality.js](file:///Users/johnmather/coding/Anti/escape%20room%20game/client/src/utils/adaptiveQuality.js)
 Device detection and GPU tier assessment. Exports a quality config object (`{ shadows, dpr, antialias, bloom, maxLights }`) consumed by `GameCanvas.jsx`.
 
@@ -235,16 +205,16 @@ Device detection and GPU tier assessment. Exports a quality config object (`{ sh
 #### Client — 3D Components
 
 #### [NEW] [client/src/components/GameCanvas.jsx](file:///Users/johnmather/coding/Anti/escape%20room%20game/client/src/components/GameCanvas.jsx)
-The `@react-three/fiber` canvas hosting the Rapier physics world, 3D room, camera configurations, lights (point lights, ambient lights, spotlights), and adaptive quality settings. Wraps scene in `<Suspense>` with `<LoadingScreen />` fallback.
+The `@react-three/fiber` canvas hosting the 3D room, camera configurations, lights (point lights, ambient lights, spotlights), and adaptive quality settings. Combines the custom physics step in the `useFrame` game loop.
 
 #### [NEW] [client/src/components/Room.jsx](file:///Users/johnmather/coding/Anti/escape%20room%20game/client/src/components/Room.jsx)
-3D room geometry — walls, floor, ceiling, furniture, partitions. All static meshes use `RigidBody type="fixed"` with simplified box colliders. Loads compressed `.glb` models.
+3D room geometry — walls, floor, ceiling, decorative pipes, and partitions. Generates meshes procedurally from primitive geometry components, applying glowing neon wireframes and metallic materials.
 
 #### [NEW] [client/src/components/Player.jsx](file:///Users/johnmather/coding/Anti/escape%20room%20game/client/src/components/Player.jsx)
-The player avatar (visualized as a stylish neon droid/probe or astronaut capsule) with Rapier `RigidBody type="dynamic"` capsule collider, unified input handling (keyboard + touch via `usePlayerControls`), and floating tag names. Supports client-side prediction for local player movement.
+The player avatar (visualized as a stylish neon droid/probe or glowing helmet capsule) with movement speed controls, collision checks against the custom physics module, keyboard/touch input handling, and floating name tag. Supports client-side prediction.
 
 #### [NEW] [client/src/components/PuzzleTerminal.jsx](file:///Users/johnmather/coding/Anti/escape%20room%20game/client/src/components/PuzzleTerminal.jsx)
-Interactive 3D meshes for pressure plates, wire boards, and mirrors that players can click/tap or stand on to interact. Uses Rapier sensor colliders for proximity detection. On mobile, wire board puzzle opens an HTML overlay with large toggle switches.
+Interactive 3D meshes for pressure plates, wire boards, and mirrors that players can click/tap or stand on. Uses radial distance triggers for proximity detection. On mobile, wire board puzzle opens an HTML overlay with large toggle switches.
 
 #### [NEW] [client/src/components/LaserBeam.jsx](file:///Users/johnmather/coding/Anti/escape%20room%20game/client/src/components/LaserBeam.jsx)
 Raycasted laser beam with mirror reflection logic. Uses Three.js `Raycaster` to compute beam path through mirror chain. Visual beam rendered as a glowing cylinder mesh with emissive material.
@@ -306,6 +276,40 @@ Puzzle state machines and validation logic, separated from networking concerns:
 - **Puzzle 2**: Checks all 3 scanner activations occurred within a 1.5-second window. Implements lockout cooldown on failure.
 - **Puzzle 3**: Validates laser beam path hits the receiver target (server-side raycasting against mirror positions).
 - Orchestrates puzzle unlock chain (1 → 2 → 3 → escape pod).
+
+---
+
+## Bootstrap & Dependencies Setup
+
+### 1. Root Configuration
+We will use concurrent execution to launch both client and server development environments together:
+
+#### [NEW] [package.json](file:///Users/johnmather/coding/Anti/escape%20room%20game/package.json)
+```json
+{
+  "name": "escape-room-monorepo",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && npm install --prefix client && npm install --prefix server",
+    "dev": "concurrently \"npm run dev --prefix client\" \"npm start --prefix server\"",
+    "build:client": "npm run build --prefix client",
+    "build:server": "npm run build --prefix server"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+```
+
+### 2. Client Dependencies
+- **Vite & React** for development & rendering.
+- **Three, @react-three/fiber, @react-three/drei** for 3D graphics rendering.
+- **Zustand** for direct, high-frequency state updates.
+- **Socket.io-client** for real-time networking.
+
+### 3. Server Dependencies
+- **Express & CORS** for serving HTTP and handling origins.
+- **Socket.io** for real-time server-side state broadcasts.
 
 ---
 
