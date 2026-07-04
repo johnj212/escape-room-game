@@ -9,6 +9,37 @@ import { Room } from './Room'
 import { Player } from './Player'
 import { WirePuzzle } from './WirePuzzle'
 
+// Harness instrumentation: exposes live render stats + a scene-ready flag on `window`
+// for the verification tooling (tools/perf-probe.mjs, tools/capture-hero.mjs). Reads
+// renderer.info.render, which is identical for WebGL now and WebGPU at the Phase-1 swap.
+// This is the data layer of the §5 performance HUD; the visual HUD is a later deliverable.
+const PerfProbe = () => {
+  const gl = useThree((state) => state.gl)
+  const sample = useRef({ frames: 0, last: performance.now(), fps: 0 })
+
+  useFrame(() => {
+    const now = performance.now()
+    const s = sample.current
+    s.frames += 1
+    const dt = now - s.last
+    if (dt >= 500) {
+      s.fps = Math.round((s.frames * 1000) / dt)
+      s.frames = 0
+      s.last = now
+    }
+
+    const render = gl?.info?.render
+    window.__PERF__ = {
+      fps: s.fps,
+      drawCalls: render?.calls ?? 0,
+      triangles: render?.triangles ?? 0,
+    }
+    if (!window.__SCENE_READY__) window.__SCENE_READY__ = true
+  })
+
+  return null
+}
+
 // Custom Camera Controller to smoothly track the active player
 const CameraFollow = () => {
   const { camera } = useThree()
@@ -135,7 +166,8 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
       </Physics>
 
       <CameraFollow />
-      
+      <PerfProbe />
+
       {/* Post-Processing Effects (Disabled on Mobile for performance) */}
       {!isMobile && (
         <EffectComposer>

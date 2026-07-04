@@ -1,0 +1,313 @@
+#!/usr/bin/env node
+// tools/verify.mjs — verification battery runner (Component 4).
+//
+// Spec: docs/superpowers/specs/2026-07-04-phase0-verification-harness-design.md, Component 4.
+//
+// Runs a phase's check manifest as REAL subprocesses (no stubs, no fabricated results),
+// prints a numbered PASS/FAIL table, writes a machine-readable JSON summary to
+// tools/.last-verify.json, and exits non-zero iff any HARD check failed. Steps 4-5
+// (perf baseline / bundle size) are record-only in Phase 0 and never affect the exit code —
+// they exist to capture numbers, not to gate the phase.
+//
+// CLI: node tools/verify.mjs [--phase <N>]   (default --phase 0)
+
+import { spawn } from 'node:child_process'
+import path from 'node:path'
+import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const REPO_ROOT = path.resolve(__dirname, '..')
+const SUMMARY_PATH = path.join(__dirname, '.last-verify.json')
+
+function parseArgs(argv) {
+  const args = { phase: 0 }
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--phase') args.phase = Number(argv[++i])
+  }
+  return args
+}
+
+const MAX_TAIL_LINES = 80
+
+function tail(text, n = MAX_TAIL_LINES) {
+  const lines = text.split('\n')
+  return lines.slice(Math.max(0, lines.length - n)).join('\n')
+}
+
+function fmtDuration(ms) {
+  if (ms == null) return '—'
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`
+}
+
+// Runs `cmd args…` as a real child process, tee-ing its stdout/stderr live to this process's
+// own streams (so a human watching `verify` sees full lint/test/e2e output as it happens)
+// while also buffering everything for the JSON summary. Resolves on both success and failure —
+// a non-zero exit code is a normal FAIL outcome for the caller to interpret, not a runner bug.
+function runCommand(cmd, args, { cwd = REPO_ROOT, timeoutMs = 6 * 60_000 } = {}) {
+  return new Promise((resolve) => {
+    const start = Date.now()
+    console.log(`\n$ ${cmd} ${args.join(' ')}  (cwd: ${path.relative(REPO_ROOT, cwd) || '.'})\n`)
+    let child
+    try {
+      child = spawn(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (err) {
+      resolve({
+        code: null,
+        signal: null,
+        stdout: '',
+        stderr: `[verify] failed to spawn '${cmd}': ${err.message}`,
+        durationMs: Date.now() - start,
+        timedOut: false,
+      })
+      return
+    }
+
+    let stdout = ''
+    let stderr = ''
+    let timedOut = false
+
+    const killTimer = setTimeout(() => {
+      timedOut = true
+      child.kill('SIGKILL')
+    }, timeoutMs)
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk
+      process.stdout.write(chunk)
+    })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk
+      process.stderr.write(chunk)
+    })
+
+    child.on('error', (err) => {
+      clearTimeout(killTimer)
+      resolve({
+        code: null,
+        signal: null,
+        stdout,
+        stderr: stderr + `\n[verify] failed to spawn '${cmd}': ${err.message}`,
+        durationMs: Date.now() - start,
+        timedOut: false,
+      })
+    })
+
+    child.on('close', (code, signal) => {
+      clearTimeout(killTimer)
+      resolve({
+        code,
+        signal,
+        stdout,
+        stderr,
+        durationMs: Date.now() - start,
+        timedOut,
+      })
+    })
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Phase manifests
+// ---------------------------------------------------------------------------
+
+function phase0Manifest() {
+  return [
+    {
+      id: 1,
+      name: 'Static gate (eslint, 0 warnings)',
+      hard: true,
+      async run() {
+        const res = await runCommand('npm', ['run', 'lint', '--prefix', 'client'])
+        return {
+          pass: res.code === 0,
+          status: res.code === 0 ? 'PASS' : 'FAIL',
+          durationMs: res.durationMs,
+          note: res.code === 0 ? '0 warnings/errors' : tail(res.stdout + res.stderr),
+        }
+      },
+    },
+    {
+      id: 2,
+      name: 'Unit tests (vitest)',
+      hard: true,
+      async run() {
+        const res = await runCommand('npm', ['test', '--prefix', 'client'])
+        return {
+          pass: res.code === 0,
+          status: res.code === 0 ? 'PASS' : 'FAIL',
+          durationMs: res.durationMs,
+          note: res.code === 0 ? 'all specs passed' : tail(res.stdout + res.stderr),
+        }
+      },
+    },
+    {
+      id: 3,
+      name: 'E2E (playwright)',
+      hard: true,
+      async run() {
+        const res = await runCommand('npm', ['run', 'e2e', '--prefix', 'client'], {
+          timeoutMs: 10 * 60_000,
+        })
+        return {
+          pass: res.code === 0,
+          status: res.code === 0 ? 'PASS' : 'FAIL',
+          durationMs: res.durationMs,
+          note: res.code === 0 ? 'e2e suite green' : tail(res.stdout + res.stderr),
+        }
+      },
+    },
+    {
+      id: 4,
+      name: 'Perf baseline (record-only)',
+      hard: false,
+      async run() {
+        // Real subprocess call every time, per spec — not a stub. If tools/perf-probe.mjs
+        // doesn't exist yet (it's being authored concurrently by another agent), Node itself
+        // will fail to resolve the module; that specific failure is treated as "not landed
+        // yet" and reported without failing the battery, since this step is record-only in
+        // Phase 0 regardless of *why* it didn't produce numbers.
+        const res = await runCommand('node', ['tools/perf-probe.mjs', '--mode', 'record'])
+        const combined = res.stdout + res.stderr
+        const moduleMissing =
+          res.code !== 0 &&
+          /cannot find module/i.test(combined) &&
+          /perf-probe\.mjs/i.test(combined)
+
+        if (moduleMissing) {
+          return {
+            pass: null,
+            status: 'SKIP',
+            durationMs: res.durationMs,
+            note: 'record step: perf-probe.mjs not present yet',
+          }
+        }
+        if (res.code === 0) {
+          return {
+            pass: true,
+            status: 'RECORD',
+            durationMs: res.durationMs,
+            note: tail(res.stdout, 20) || 'recorded (see STATUS.md)',
+          }
+        }
+        return {
+          pass: null,
+          status: 'RECORD-ERROR',
+          durationMs: res.durationMs,
+          note: `perf-probe.mjs ran but exited ${res.code} (record-only, non-blocking):\n${tail(combined)}`,
+        }
+      },
+    },
+    {
+      id: 5,
+      name: 'Bundle size (record-only, surfaced via step 4)',
+      hard: false,
+      // No independent subprocess — perf-probe.mjs builds the client and measures gzip
+      // size as part of its own run (spec Component 3); this row just reflects that result
+      // so the table has an explicit line for check #5 in Project_Requirements.md §5.
+      async run(context) {
+        const step4 = context.results.find((r) => r.id === 4)
+        if (!step4) {
+          return { pass: null, status: 'SKIP', durationMs: null, note: 'step 4 did not run' }
+        }
+        if (step4.status === 'SKIP') {
+          return {
+            pass: null,
+            status: 'SKIP',
+            durationMs: null,
+            note: 'surfaced by step 4 (perf-probe.mjs not present yet)',
+          }
+        }
+        return {
+          pass: step4.pass,
+          status: step4.status,
+          durationMs: null,
+          note: 'surfaced by step 4 — see that row / STATUS.md for the bundle-size numbers',
+        }
+      },
+    },
+  ]
+}
+
+const MANIFESTS = {
+  0: phase0Manifest,
+}
+
+// ---------------------------------------------------------------------------
+// Runner
+// ---------------------------------------------------------------------------
+
+async function main() {
+  const { phase } = parseArgs(process.argv.slice(2))
+  const buildManifest = MANIFESTS[phase]
+
+  if (!buildManifest) {
+    console.error(
+      `[verify] no check manifest defined for --phase ${phase}. Defined phases: ${Object.keys(MANIFESTS).join(', ')}`,
+    )
+    process.exitCode = 1
+    return
+  }
+
+  const manifest = buildManifest()
+  const results = []
+  const context = { results }
+
+  for (const check of manifest) {
+    const outcome = await check.run(context)
+    results.push({ id: check.id, name: check.name, hard: check.hard, ...outcome })
+  }
+
+  const hardFailures = results.filter((r) => r.hard && !r.pass)
+  const overallPass = hardFailures.length === 0
+
+  // ---- numbered PASS/FAIL table ----
+  console.log(`\nPhase ${phase} verification battery\n${'='.repeat(70)}`)
+  const idW = 3
+  const nameW = Math.max(...results.map((r) => r.name.length), 'Check'.length) + 2
+  const typeW = 12
+  const header = `${'#'.padEnd(idW)}${'Check'.padEnd(nameW)}${'Type'.padEnd(typeW)}${'Result'.padEnd(9)}Time`
+  console.log(header)
+  console.log('-'.repeat(header.length + 6))
+  for (const r of results) {
+    const typeLabel = r.hard ? 'HARD' : 'record-only'
+    console.log(
+      `${String(r.id).padEnd(idW)}${r.name.padEnd(nameW)}${typeLabel.padEnd(typeW)}${r.status.padEnd(9)}${fmtDuration(r.durationMs)}`,
+    )
+  }
+  console.log('='.repeat(70))
+
+  for (const r of results) {
+    if (r.status === 'FAIL' || r.status === 'RECORD-ERROR') {
+      console.log(`\n--- [${r.id}] ${r.name} — ${r.status} ---`)
+      console.log(r.note)
+    }
+  }
+
+  const hardTotal = results.filter((r) => r.hard).length
+  const hardPassed = hardTotal - hardFailures.length
+  console.log(
+    `\nHARD checks: ${hardPassed}/${hardTotal} passed → BATTERY: ${overallPass ? 'PASS' : 'FAIL'}`,
+  )
+  if (!overallPass) {
+    console.log(`Failed: ${hardFailures.map((r) => `#${r.id} ${r.name}`).join(', ')}`)
+  }
+
+  const summary = {
+    phase,
+    timestamp: new Date().toISOString(),
+    overallPass,
+    hardTotal,
+    hardPassed,
+    checks: results,
+  }
+  fs.writeFileSync(SUMMARY_PATH, JSON.stringify(summary, null, 2))
+  console.log(`\n[verify] summary written to ${path.relative(REPO_ROOT, SUMMARY_PATH)}`)
+
+  process.exitCode = overallPass ? 0 : 1
+}
+
+main().catch((err) => {
+  console.error('[verify] runner crashed:', err)
+  process.exitCode = 1
+})

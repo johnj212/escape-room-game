@@ -9,9 +9,15 @@
     "dev:client": "npm run dev --prefix client",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build:client": "npm run build --prefix client",
-    "build": "npm run build:client"
+    "build": "npm run build:client",
+    "verify": "node tools/verify.mjs",
+    "capture": "node tools/capture-hero.mjs",
+    "perf": "node tools/perf-probe.mjs"
   },
   "dependencies": {
     "concurrently": "^8.2.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
   }
 }
