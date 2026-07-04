@@ -51,7 +51,7 @@ Recorded 2026-07-04 via `node tools/perf-probe.mjs --mode record --profile deskt
 
 | Metric | Value |
 | --- | --- |
-| fps (median) | 18 |
+| fps (median) | 27 |
 | drawCalls (median) | 1 |
 | triangles (median) | 2 |
 | samples | 29 |
