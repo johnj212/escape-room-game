@@ -1,6 +1,87 @@
-# Handoff: Sector-9 Command Deck Escape Room Game (v0.2)
+# Handoff: Sector-9 Command Deck
 
-This handoff document summarizes the initial request, what worked, what didn't work (along with the solutions implemented), and key lessons learned for future development sessions.
+> **Two-layer document.** §0 below is the CURRENT session state (read this first).
+> Everything from "Handoff (v0.2)" onward is the historical build log for the
+> original R3F v8 game — kept for its hard-won debugging lessons, not as current
+> status. When in doubt, `STATUS.md` is the source of truth, not this file.
+
+---
+
+## 0. Current session handoff (2026-07-04) — READ FIRST
+
+### Rehydration (do this before touching anything)
+
+1. Read `STATUS.md` fully — it is the live rehydration protocol and phase tracker.
+2. Read `Project_Requirements.md` (the brief: pillars, floors, banned outcomes, phases).
+3. Read `docs/R3F-WEBGPU-NOTES.md` (verified stack facts — do not re-derive from memory).
+4. Skim `docs/DEVIATIONS.md` and the newest entries of `docs/DELTA.md`.
+5. **Never re-plan from scratch.** Continue from STATUS.md "Current focus".
+
+### Where we are
+
+- **Phase 0 (scaffold + harness), gate now GREEN.** The verify battery passes 3/3
+  hard checks (eslint 0-warnings, vitest 13 tests, Playwright e2e).
+- The current checked-in app still renders on **React Three Fiber v8 → WebGLRenderer**.
+  There is **no WebGPU code in `client/src` yet** — the WebGPU-only end state in
+  `Project_Requirements.md` describes the *Phase 1 target*, not today's build.
+- All work is on **`main`** (pushed: `b7d1c75`) and branch
+  `docs/sector9-requirements-scaffold` (pushed). Working tree clean.
+
+### What this session did
+
+- Diagnosed a red verify gate. Root cause: commit `51cfad3` had removed the `e2e`
+  npm script + `@playwright/test` dep from `client/package.json`, and the file
+  also carried a stray `cla` prefix (invalid JSON). Restored both; stripped the typo.
+- `vite.config.js`: added `test.exclude` for `e2e/**` so vitest stops trying to run
+  the Playwright spec (its `test.describe` is incompatible with the vitest runner).
+- eslint 52 → 0: removed genuine dead code; added a documented `react/prop-types: off`
+  (plain-JSX, all-internal components); annotated two intentional mount-only effects
+  with justified `exhaustive-deps` disables.
+- Merged `origin/main`'s stray doc commit (`REFACTOR PLAN.md`) back in; pushed `main`.
+
+### The one command that matters
+
+```bash
+node tools/verify.mjs        # from repo root — must print "BATTERY: PASS" (3/3 hard)
+```
+
+Run it before claiming ANY work is done. Do not disable a test or lint rule to go
+green (a documented, principled rule-scope like the two in `.eslintrc.cjs` is the
+only exception, and it must be justified in a comment). STATUS.md line 11 is the
+governing discipline: **audit every progress claim against a tool result from the
+current session — a screenshot, a test run, a measured number.**
+
+### Manual test
+
+- Client dev server (solo mode, no backend needed): `npm run dev --prefix client`
+  → open the printed `http://localhost:517x/`. Solo-swap the three roles with keys
+  `1` / `2` / `3`. Full multiplayer additionally needs the Node/Socket.io server.
+
+### Next steps (from STATUS.md "Next actions", in order)
+
+1. **Build the WebGPU capability gate + designed "unsupported" screen** — REQUIRED
+   before the Phase 1 renderer swap so non-WebGPU devices never hit a raw crash.
+   Add its Playwright test (forced non-WebGPU context → unsupported screen, zero
+   console exceptions).
+2. Confirm the React Three Fiber v9 + three.js `WebGPURenderer` integration path
+   against installed source; log findings in `docs/R3F-WEBGPU-NOTES.md`. When Phase 1
+   lands, update `client/e2e/puzzle1.spec.js`'s "app boot" test to assert a WebGPU
+   context on the app canvas instead of WebGL.
+3. Then Phase 1 proper (xhigh effort): WebGPU render-layer rebuild + Puzzle 1 re-homed.
+
+### Open flags (noted, not yet acted on)
+
+- `client/src/components/UIOverlays.jsx` imports a PNG asset (`sector_9_deck_*.png`).
+  Potential tension with the zero-external-assets floor — but it's the lobby, not the
+  play route. Decide during the Phase-1/visual pass; log to `docs/DEVIATIONS.md` if kept.
+
+---
+
+# Handoff (v0.2) — historical build log (original R3F v8 game)
+
+This section summarizes the original build: initial request, what worked, what
+didn't (with solutions), and lessons learned. Retained for its debugging lessons;
+the Rapier/camera/NaN gotchas below still apply under the current stack.
 
 ---
 
