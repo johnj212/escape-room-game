@@ -23,7 +23,7 @@ There are **two** reference bars, and every phase is judged against both, side-b
 
 Every requirement in this document serves one of these. If a decision arises that the document doesn't cover, resolve it in favor of the pillar it serves — and record the decision, don't ask permission.
 
-**A. Forced interdependence.** The game exists because no one can escape alone. Every puzzle splits *information* from *action* or *sightline* from *control* across roles. *Rule: for each puzzle, an automated test proves it is impossible to complete with a single role's information and inputs. If one player can solve it alone, it is not a co-op puzzle and the phase fails.*
+**A. Forced interdependence.** The game exists because no one can escape alone. Every puzzle splits *information* from *action* or *sightline* from *control* across roles. *Rule: for each puzzle, an automated test proves it is impossible to complete with fewer than the required number of roles' information and inputs. If one player can solve it alone, it is not a co-op puzzle and the phase fails.* **Solo-swap is not an exemption from role separation.** In solo mode the single player must still swap characters to gather each role's information and issue each role's input — sightline and control never collapse into one character. A puzzle that silently becomes single-actor when `isSolo` is true (e.g. a role gate bypassed for convenience) has dropped its interdependence and fails Pillar A exactly as a solvable-alone multiplayer puzzle would. **Role budget by puzzle: P1 = 2 roles (Engineer sightline / Technician control); P2 and P3 = all 3 roles.**
 
 **B. Geometry & light, not textures — asset-free.** Detail lives in modeled geometry and light transport, not in flat normal-mapped planes, and **every pixel of it is generated in code** — meshes, textures, LUTs, irradiance probes, noise volumes. *Rule: no external asset (image, `.glb`, audio file, font binary in the critical path) ships in the play route. The reference PNG lives in `reference/` only and is never imported by `client/src`.*
 
@@ -97,9 +97,9 @@ One scene, **two rendering profiles** behind an adaptive-quality ladder. A devic
 10. Networking: lobby, room codes, 3 role slots, join/leave, reconnect banner
 11. Server game loop (30 Hz) + authoritative countdown timer
 12. Puzzle engine: three state machines + the 1 → 2 → 3 unlock chain + reset/lockout semantics
-13. **Puzzle 1 — Decoupled Power Grid** (asymmetric: Engineer sees the cipher hologram, Technician toggles the gated switchboard)
-14. **Puzzle 2 — Tri-Vector Hand Scanners** (simultaneous: all 3 activate within a 1.5 s window; failure → lockout cooldown)
-15. **Puzzle 3 — Laser Deflection Array** (spatial: one steers the emitter, one rotates mirrors, one guides from the receiver; server-side raycast validates the hit)
+13. **Puzzle 1 — Decoupled Power Grid** (asymmetric, **2-role**: Engineer sees the cipher hologram, Technician toggles the gated switchboard — in solo-swap the player must swap between the two; the Engineer's sightline and the Technician's controls never collapse into one character, in solo or 3-client)
+14. **Puzzle 2 — Tri-Vector Hand Scanners** (simultaneous, **3-role**: all 3 scanners must be armed within a 1.5 s rolling window; failure → lockout cooldown. Each scanner *latches* armed for a few seconds after activation, so a solo-swap player arms all three across character swaps and the same identical puzzle resolves — never a relaxed or sequential solo variant)
+15. **Puzzle 3 — Laser Deflection Array** (spatial, **3-role**: one steers the emitter, one rotates mirrors, one guides from the receiver; server-side raycast validates the hit)
 16. HUD / overlays: diegetic holographic timer, per-role objective, lobby, win/lose, unsupported screen
 17. Diegetic FX: reactor alarm states escalating with the clock, meltdown loss sequence, escape-pod launch win sequence
 
@@ -109,7 +109,7 @@ Enforced on every instance of the recurring unit, not just the headline feature:
 
 - **Every surface:** PBR, generated in TSL, zero image files; emissive neon uses bloom-aware intensity; no flat unlit color anywhere in a hero shot.
 - **Every shadow-casting light:** contributes to the CSM; obeys the no-black-shadows law (Pillar C) — shadowed regions are filled by probe/skylight bounce.
-- **Every puzzle:** server-authoritative validation; a defined reset and a defined failure/lockout; solvable in solo-swap **and** 3-client; requires ≥ 2 roles (Pillar A); every input reachable on touch **and** keyboard.
+- **Every puzzle:** server-authoritative validation; a defined reset and a defined failure/lockout; solvable in solo-swap **and** 3-client as the *identical* puzzle (never an easier solo variant); requires ≥ 2 roles (P1 = 2, P2 and P3 = all 3) per Pillar A; solo-swap exercises every required role — via latched/held state where the puzzle is simultaneous — and never collapses roles into one actor; every input reachable on touch **and** keyboard.
 - **Every interactive prop:** a proximity trigger, a visual affordance (glow/pulse on approach), and clear state feedback on activation.
 - **Every UI overlay:** works in portrait and landscape; respects `prefers-reduced-motion`; never blocks with a native `alert`/`confirm`.
 
@@ -130,9 +130,9 @@ A phase closes only after: build → run → verification battery → `docs/DELT
 | Phase | Effort | Deliverable | Gate |
 |---|---|---|---|
 | 0 | high | Scaffold + harness | `STATUS.md`, `docs/DELTA.md`, `docs/DEVIATIONS.md` (seeded with D-1 Rapier), `docs/R3F-WEBGPU-NOTES.md` created; Playwright + perf HUD + capability gate exist; `reference/` populated (PNG moved out of `client/src`); baseline test run green |
-| 1 | **xhigh** | WebGPU render-layer rebuild + Puzzle 1 re-homed on it | Room renders on `WebGPURenderer` + TSL, fully asset-free (no image imported by `client/src`); desktop hits the full shadow stack + fps floor and mobile hits the scaled profile + fps floor; unsupported screen works; reference-delta round 1 complete |
-| 2 | high | Puzzle 2 (scanners) + 1 → 2 chain wired server-side | e2e solves P1 → P2; simultaneous 1.5 s window + lockout verified; server-authoritative; reference-delta |
-| 3 | **xhigh** | Puzzle 3 (laser) + full escape | e2e completes 1 → 2 → 3 escape; laser path server-raycast-validated; win/lose sequences fire; server-authoritative; reference-delta |
+| 1 | **xhigh** | WebGPU render-layer rebuild + Puzzle 1 re-homed on it | Room renders on `WebGPURenderer` + TSL, fully asset-free (no image imported by `client/src`); desktop hits the full shadow stack + fps floor and mobile hits the scaled profile + fps floor; unsupported screen works; P1 solo-swap enforces role separation (a test proves the player must swap Engineer → Technician — the old `isSolo` role-gate bypass is gone); reference-delta round 1 complete |
+| 2 | high | Puzzle 2 (scanners) + 1 → 2 chain wired server-side | e2e solves P1 → P2; simultaneous 1.5 s window + latched-arm solo-swap solve + lockout verified; a test proves 2 roles cannot complete it (Pillar A, 3-role); server-authoritative; reference-delta |
+| 3 | **xhigh** | Puzzle 3 (laser) + full escape | e2e completes 1 → 2 → 3 escape; laser path server-raycast-validated; a test proves 2 roles cannot complete it (Pillar A, 3-role); win/lose sequences fire; server-authoritative; reference-delta |
 | 4 | high | Mobile/touch parity + adaptive ladder + graceful degradation | Mobile e2e + emulated-device perf ≥ 30 fps; touch and solo-swap reach every action; unsupported screen verified on a forced non-WebGPU context |
 | 5 | high | Visual reference-delta pass + atmosphere/motion (Pillar F) | Reference-delta top-three closed across all rooms; alarm-escalation + win/lose sequences land; self-score ≥ 7 on every rubric row; human visual sign-off |
 
