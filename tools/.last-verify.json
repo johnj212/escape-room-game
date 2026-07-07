@@ -1,6 +1,6 @@
 {
   "phase": 0,
-  "timestamp": "2026-07-07T06:04:07.013Z",
+  "timestamp": "2026-07-07T06:05:46.702Z",
   "overallPass": true,
   "hardTotal": 3,
   "hardPassed": 3,
@@ -11,7 +11,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 777,
+      "durationMs": 680,
       "note": "0 warnings/errors"
     },
     {
@@ -20,7 +20,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 639,
+      "durationMs": 620,
       "note": "all specs passed"
     },
     {
@@ -29,7 +29,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 9958,
+      "durationMs": 9460,
       "note": "e2e suite green"
     },
     {
@@ -38,7 +38,7 @@
       "hard": false,
       "pass": true,
       "status": "RECORD",
-      "durationMs": 8316,
+      "durationMs": 10313,
       "note": "[dev-server] starting `npm run dev --prefix client`...\n[dev-server] ready\n[perf-probe] sampling __PERF__ for 3000ms (desktop)...\n[perf-probe] building client (`npm run build --prefix client`)...\n\nPhase-0 perf-probe results (WebGL, current pre-Phase-1 build)\n---------------------------------------------\nprofile                   : desktop\nfps (median)              : 27\ndrawCalls (median)        : 1\ntriangles (median)        : 2\nsamples                   : 29\nJS+CSS gzip (excl. .wasm) : 1083.5 KB\nJS+CSS files measured     : 2\n.wasm files excluded      : 0\n---------------------------------------------\n[perf-probe] STATUS.md updated (overwrote existing block): /Users/johnmather/coding/Anti/escape room game/STATUS.md\n"
     },
     {

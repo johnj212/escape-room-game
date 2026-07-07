@@ -30,7 +30,7 @@ Build the Sector-9 Command Deck: a 3-role, high-cooperation escape room (Enginee
 
 ## Phase checklist
 
-- [ ] **Phase 0** — Scaffold + harness (STATUS/DELTA/DEVIATIONS/NOTES, Playwright, perf HUD, capability gate, `reference/` populated, green baseline)
+- [x] **Phase 0** — Scaffold + harness — **GATE CLOSED 2026-07-07, gate-verifier verdict PASS** (fresh-context agent; independently re-ran the battery → 3/3 HARD PASS, verified all six gate items with tool evidence, zero banned outcomes in the Phase-0 surface). Its two non-blocking flags are both addressed/scheduled: reference asset corrected (see below), font/PNG deviations formalization scheduled into Phase 1.
 - [ ] **Phase 1 (xhigh)** — WebGPU render-layer rebuild + Puzzle 1 re-homed; asset-free; desktop + mobile fps floors met; unsupported screen; reference-delta round 1
 - [ ] **Phase 2** — Puzzle 2 (scanners) + 1 → 2 chain server-side; lockout; reference-delta
 - [ ] **Phase 3 (xhigh)** — Puzzle 3 (laser) + full escape; server-raycast validated; win/lose sequences; reference-delta
@@ -49,6 +49,8 @@ Phase 0 in progress. Operating files scaffolded (this file, `docs/DELTA.md`, `do
 
 **Open flag (found 2026-07-07):** `client/src/index.css:1` `@import`s Google Fonts (Inter + Orbitron) at runtime — an external asset in the play route (Pillar B tension), alongside the known lobby PNG flag in `handoff.md` §0. Both must be resolved in Phase 1's asset-free pass (procedural/system-font substitute or a `docs/DEVIATIONS.md` entry).
 
+**PHASE 0 GATE CLOSED — verdict PASS** (2026-07-07, fresh-context gate-verifier). Evidence: independent battery re-run (3/3 HARD), per-item file/grep/test verification, hero shot captured to `docs/shots/phase0-hero.png`, Phase-0 self-score rubric recorded in the verifier report (A:4 B:2 C:2 D:2 E:7 F:2 Perf:2 Reliability:10 — low rows are all Phase 1/2/5 scope by design, honestly scored against the final bar). **Reference asset corrected:** the verifier found `reference/media__new_visuals.png` is a flat lobby/menu card, not the lit 3D deck render the brief describes; the true render (`assets/sector_9_deck_1779639466019.png` — reactor core, greebles, fog, bounce light) is now at **`reference/sector9_deck_hero.png`** and is the primary visual grading reference from Phase 1 on (decision + delta logged in `docs/DELTA.md` 2026-07-07). The brief's §"The bar" pointer should be read accordingly; the bar itself is unchanged.
+
 **Perf HUD SHIPPED + R3F v9 path CONFIRMED** (2026-07-07): `client/src/components/PerfHud.jsx` — visible layer over the existing `window.__PERF__` feed (F3 toggle / `?hud=1`, fps color-coded against the 30/60 floors); e2e-verified in `puzzle1.spec.js` (toggles on, reports live fps > 0, toggles off) — battery PASS. R3F v9 + `WebGPURenderer` integration path verified against installed source in a scratch install (fiber 9.6.1 / three 0.185.1): async `gl` factory awaited by fiber, factory must call `await renderer.init()`, **React 19 required**, full Phase-1 dep matrix + the finding that `@react-three/postprocessing` should be dropped for three's own `PostProcessing` + TSL display nodes — all in `docs/R3F-WEBGPU-NOTES.md` (2026-07-07 entry). **All Phase 0 deliverables now built; gate-verifier dispatch is the only step left before closing Phase 0.**
 
 ## Phase-0 baseline (WebGL)
@@ -66,12 +68,14 @@ Recorded 2026-07-07 via `node tools/perf-probe.mjs --mode record --profile deskt
 _Phase 0 records the current WebGL numbers only — not compared against the WebGPU floors in `Project_Requirements.md` §2 (desktop >=60fps/>=2M tris/<=500KB gzip, mobile >=30fps/>=0.5M tris). `perf-probe.mjs --mode assert` enforces those floors from Phase 1 onward._
 ## Next actions
 
-1. ~~Establish the current WebGL build's baseline (fps, bundle size)~~ — done, see "Phase-0 baseline (WebGL)" table above (auto-refreshed by each verify run).
-2. ~~Stand up Playwright and write the first e2e: solo-swap solve of Puzzle 1~~ — done 2026-07-04, see above.
-3. ~~Build the capability-gate + designed unsupported screen + its Playwright test~~ — done 2026-07-07, see above.
-4. ~~Confirm React Three Fiber v9 + three.js `WebGPURenderer` integration path against installed source~~ — done 2026-07-07 via scratch install, findings in `docs/R3F-WEBGPU-NOTES.md`. (Still open for Phase 1 itself: swap `puzzle1.spec.js`'s app-boot WebGL assertion to WebGPU when the renderer lands.)
-5. ~~Build the in-scene perf HUD~~ — done 2026-07-07, see above.
-6. Dispatch the `gate-verifier` agent on Phase 0; fix anything it surfaces; close the Phase 0 gate in the checklist above. Then Phase 1 (xhigh): WebGPU render-layer rebuild + Puzzle 1 re-homed (incl. removing the `isSolo` role bypass at `WirePuzzle.jsx:47`, killing the Google-Fonts/lobby-PNG external assets or logging deviations).
+**Phase 0 is closed.** Phase 1 (xhigh — WebGPU render-layer rebuild + Puzzle 1 re-homed) task order:
+
+1. **Dependency migration** (all peer-locked together, verified matrix in `docs/R3F-WEBGPU-NOTES.md` 2026-07-07): react/react-dom 19, @react-three/fiber 9, drei 10, rapier 2; **remove** @react-three/postprocessing (WebGL-only — replaced by `three/webgpu` `PostProcessing` + TSL display nodes); three latest. Get the app booting on `WebGPURenderer` via the async `gl` factory (`await renderer.init()`), swap `puzzle1.spec.js`'s app-boot assertion WebGL → WebGPU, battery green.
+2. Modular render layer per the brief's structure (`client/src/render/`, `client/src/gpu/`): TSL procedural material library (brushed metal, scratched plating, glass, emissive neon), procedural deck geometry + greebling toward the ≥2M-triangle hero floor.
+3. Lighting rig: 4-cascade CSM ≥2048² + PCSS + screen-space contact shadows (desktop profile), probe-volume GI (compute at load) + GTAO, no-black-shadows law.
+4. Post stack on `PostProcessing` + TSL nodes: bloom, volumetric shafts (GodraysNode), tonemap, vignette, CA — profile-gated.
+5. Asset-free pass: kill the Google-Fonts `@import` + lobby PNG import (or `docs/DEVIATIONS.md` entries); re-home Puzzle 1 with the `isSolo` role bypass at `WirePuzzle.jsx:47` REMOVED + a Pillar-A test proving the solo player must swap Engineer → Technician.
+6. Floors: desktop ≥60 fps/≥2M tris/≤500 KB gzip via `perf-probe.mjs --mode assert`; mobile profile scaled. Reference-delta round 1 against **`reference/sector9_deck_hero.png`** → fix top three → re-render → dispatch gate-verifier on Phase 1.
 
 ## Gotchas (append-only; newest first)
 
