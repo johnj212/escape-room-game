@@ -59,11 +59,11 @@ Recorded 2026-07-07 via `node tools/perf-probe.mjs --mode record --profile deskt
 
 | Metric | Value |
 | --- | --- |
-| fps (median) | 60 |
-| drawCalls (median) | 283 |
-| triangles (median) | 123677 |
-| samples | 30 |
-| JS+CSS gzip, client/dist, excl. .wasm | 1334.8 KB (1366863 bytes) |
+| fps (median) | 52 |
+| drawCalls (median) | 391 |
+| triangles (median) | 157513 |
+| samples | 29 |
+| JS+CSS gzip, client/dist, excl. .wasm | 1337.4 KB (1369512 bytes) |
 
 _Record-only until the Phase 1 gate: not yet compared against the §2 floors (desktop >=60fps/>=2M tris/<=500KB gzip, mobile >=30fps/>=0.5M tris). `perf-probe.mjs --mode assert` enforces those floors at Phase 1 close and onward._
 ## Next actions
@@ -72,7 +72,7 @@ _Record-only until the Phase 1 gate: not yet compared against the §2 floors (de
 
 1. ~~**Dependency migration + WebGPU boot**~~ — **DONE 2026-07-07, battery PASS on the WebGPU build.** react 19.2.7 / fiber 9.6.1 / drei 10.7.7 / rapier 2.2.0 / three 0.185.1 / lucide-react 1.x installed; @react-three/postprocessing removed (unit test now asserts its absence); app renders on `WebGPURenderer` via the async `gl` factory; `puzzle1.spec.js` asserts a live `webgpu` canvas context (and that no WebGL context exists on the same canvas) + full P1 solo-swap solve green on the new stack. Measured on the WebGPU build: **60 fps median, 219 draw calls, 17,833 tris/frame** (headless desktop profile). Three debugging rounds logged in `docs/R3F-WEBGPU-NOTES.md` (StrictMode×async-factory loop kill; drei ContactShadows incompatible; `renderer.info` must be read in `addAfterEffect`). Interim states, deliberate: no post stack yet (task 4), drei Environment preset removed (external HDR — replaced by hemisphere fill until probe GI lands in task 3).
 2. ~~Modular render layer: TSL materials + procedural deck geometry~~ — **first pass DONE 2026-07-07, battery PASS.** `client/src/render/`: `prng.js` (seeded streams, `?seed=N` §1 determinism), `materials.js` (TSL library: deck plating w/ per-plate variation + seam grime, wall alloy, structural metal, flickering neon, breathing reactor-core plasma, containment glass — all NodeBuilder-clean, zero image files), `Deck.jsx` (instanced procedural deck: 100 floor plates + 400 rivets, panelled walls + ribs + seeded neon strips, pipe runs/drops, 520-greeble field, ceiling trusses + seeded sagging cables, full reactor assembly). Room.jsx is now colliders + partition only — deck visuals are the single visual source of truth; old canvas-texture room retired (generator stays until the WirePuzzle re-home, task 5). Measured: **60 fps, ~288 draws, ~124K tris** (density constants in `Deck.jsx` are the §2 2M-tri tuning knobs — raise during task 3/6 once the lighting rig defines the fps budget). Interim lighting raised to physical units + fog band widened (the old 10–25 band crushed every wall to fog-black); the frame is still visibly darker than the reference — that is task 3's job. WIP shot: `client/e2e/shots/deck-wip.png`.
-3. Lighting rig: 4-cascade CSM ≥2048² + PCSS + screen-space contact shadows (desktop profile), probe-volume GI (compute at load) + GTAO, no-black-shadows law.
+3. ~~Lighting rig (CSM + fixtures)~~ — **first pass DONE 2026-07-07, battery PASS.** `client/src/render/Lighting.jsx`: key directional through first-party `CSMShadowNode` (three/examples/jsm/csm — WebGPU-native), 4 cascades @2048² desktop / 2 @1024² mobile, fade on, PCFSoft-filtered; every light is fixture-driven (5 emissive ceiling panels each carrying its own point light, reactor core glow + alarm spot, console task lights, sector neon washes standing in for bounce until probe GI). Measured: **60 fps, ~398 draws, ~158K tris**, zero console errors; WIP shot `client/e2e/shots/deck-wip.png` — warm reactor bounce pools on the plating, sector color washes read, nothing crushes to pure black. **Still open from §2 (tracked, not dropped):** PCSS contact hardening (custom TSL shadow filter — the hook is `light.shadow.shadowNode`), screen-space contact shadows, probe-volume GI bake + GTAO (GTAO ships with the task-4 post stack). Gotcha fixed en route: camera lerp factor must clamp at 1 — WebGPU pipeline-compile frame hitches spike `delta`, `5*delta > 1` makes lerp overshoot and the camera oscillates forever (broke Html-overlay stability in e2e; see Gotchas).
 4. Post stack on `PostProcessing` + TSL nodes: bloom, volumetric shafts (GodraysNode), tonemap, vignette, CA — profile-gated.
 5. Asset-free pass: kill the Google-Fonts `@import` + lobby PNG import (or `docs/DEVIATIONS.md` entries); re-home Puzzle 1 with the `isSolo` role bypass at `WirePuzzle.jsx:47` REMOVED + a Pillar-A test proving the solo player must swap Engineer → Technician.
 6. Floors: desktop ≥60 fps/≥2M tris/≤500 KB gzip via `perf-probe.mjs --mode assert`; mobile profile scaled. Reference-delta round 1 against **`reference/sector9_deck_hero.png`** → fix top three → re-render → dispatch gate-verifier on Phase 1.
@@ -81,6 +81,7 @@ _Record-only until the Phase 1 gate: not yet compared against the §2 floors (de
 
 _(Carry forward the hard-won ones from `handoff.md` as they recur under the new stack; add new ones here rather than re-debugging.)_
 
+- Clamp frame-delta-driven lerp factors to <=1 (`Math.min(1, k*delta)`). WebGPU pipeline compiles cause multi-second delta spikes; an unclamped `lerp(target, 5*delta)` overshoots and oscillates permanently — symptom: drei `<Html>` overlays never pass Playwright's stability check ("element is not stable").
 - React 19 `<StrictMode>` + fiber v9 async WebGPU `gl` factory = frame loop freezes after first frame, zero errors. StrictMode is off in `main.jsx` on purpose. Full writeup: `docs/R3F-WEBGPU-NOTES.md` 2026-07-07.
 - Read `renderer.info` in `addAfterEffect`, never `useFrame`, under WebGPU — the renderer's internal Animation loop resets Info every tick and pre-render reads report zeros. Per-frame draws = `info.render.drawCalls` (not `calls`).
 - drei `<ContactShadows>` (and anything customizing materials via WebGL hooks) fails NodeBuilder under WebGPU with per-frame console errors that also tank fps.

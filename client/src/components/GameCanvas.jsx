@@ -5,6 +5,7 @@ import { AdaptiveDpr, AdaptiveEvents } from '@react-three/drei'
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import { useGameStore } from '../store/gameStore'
+import { Lighting } from '../render/Lighting'
 import { Room } from './Room'
 import { Player } from './Player'
 import { WirePuzzle } from './WirePuzzle'
@@ -72,7 +73,14 @@ const CameraFollow = () => {
     if (isNaN(camera.position.x) || isNaN(camera.position.y) || isNaN(camera.position.z)) {
       camera.position.set(targetCamX, targetCamY, targetCamZ)
     } else {
-      camera.position.lerp(new THREE.Vector3(targetCamX, targetCamY, targetCamZ), 5 * delta)
+      // Clamp the lerp factor: on frame hitches (e.g. WebGPU pipeline
+      // compiles) delta spikes push 5*delta past 1, which makes lerp
+      // OVERSHOOT the target and oscillate — the camera never settles and
+      // 3D-projected HTML overlays jitter forever.
+      camera.position.lerp(
+        new THREE.Vector3(targetCamX, targetCamY, targetCamZ),
+        Math.min(1, 5 * delta)
+      )
     }
     
     // Camera looks slightly ahead of player
@@ -116,64 +124,9 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
       <color attach="background" args={['#05060a']} />
       <fog attach="fog" args={['#070a12', 16, 46]} />
 
-      {/* Interim skylight fill so shadowed metal reads cool, never black
-          (Pillar C). Replaces the drei Environment "city" preset, which
-          fetched an external HDR at runtime — a Pillar B violation. The
-          real probe-volume GI lands later in Phase 1. Intensities are in
-          three's physical units (candela for point/spot with decay 2) —
-          the old WebGL-era values read near-black under WebGPU. */}
-      <hemisphereLight args={['#46587e', '#141826', 3.2]} />
-
-      {/* Dynamic Cyberpunk Lighting */}
-      <ambientLight intensity={0.55} color="#22525e" />
-      
-      <directionalLight
-        castShadow={!isMobile}
-        position={[8, 12, 6]}
-        intensity={2.6}
-        color="#c9d6ff"
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-far={40}
-        shadow-camera-left={-12}
-        shadow-camera-right={12}
-        shadow-camera-top={12}
-        shadow-camera-bottom={-12}
-        shadow-bias={-0.0005}
-      />
-      
-      {/* Emissive reactor spot light */}
-      <spotLight
-        position={[0, 7.5, -9]}
-        angle={Math.PI / 2.5}
-        penumbra={0.9}
-        intensity={140}
-        distance={20}
-        decay={2}
-        color="#ff007f"
-        castShadow={!isMobile}
-        shadow-bias={-0.0002}
-      />
-
-      {/* Local lighting above the Engineer's Hologram Console */}
-      <pointLight
-        position={[-5, 1.6, 0]}
-        intensity={38}
-        distance={6}
-        decay={2}
-        color="#00f3ff"
-        castShadow={!isMobile}
-      />
-
-      {/* Local lighting above the Technician's Switch Board */}
-      <pointLight
-        position={[5, 1.6, 0]}
-        intensity={38}
-        distance={6}
-        decay={2}
-        color="#ff007f"
-        castShadow={!isMobile}
-      />
+      {/* Lighting rig (render/Lighting.jsx): CSM key light, fixture-driven
+          fills, sector washes, reactor glow — Pillars C + F. */}
+      <Lighting isMobile={isMobile} />
 
       <Physics gravity={[0, -9.81, 0]}>
         <Room />
