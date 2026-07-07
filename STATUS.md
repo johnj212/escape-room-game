@@ -59,10 +59,10 @@ Recorded 2026-07-07 via `node tools/perf-probe.mjs --mode record --profile deskt
 
 | Metric | Value |
 | --- | --- |
-| fps (median) | 31 |
-| drawCalls (median) | 520 |
-| triangles (median) | 1344059 |
-| samples | 29 |
+| fps (median) | 2 |
+| drawCalls (median) | 518 |
+| triangles (median) | 1347447 |
+| samples | 30 |
 | JS+CSS gzip, client/dist, excl. .wasm | 483.2 KB (494752 bytes) |
 
 _Record-only until the Phase 1 gate: not yet compared against the §2 floors (desktop >=60fps/>=2M tris/<=500KB gzip, mobile >=30fps/>=0.5M tris). `perf-probe.mjs --mode assert` enforces those floors at Phase 1 close and onward._
@@ -79,7 +79,8 @@ _Record-only until the Phase 1 gate: not yet compared against the §2 floors (de
    - **Bundle floor MET: 458 KB gzip ≤ 500 KB** (was 1373 KB). Two moves: (a) vite exact-match alias `three` → `src/render/three-webgpu-shim.js`, which re-exports `three/src/Three.WebGPU.js` (source entry) plus real data-module re-exports (UniformsUtils/Lib, ShaderLib/Chunk — three-stdlib reads them at import time) and THROWING stubs for WebGLRenderer/WebGLCubeRenderTarget (imported-never-constructed by fiber/three-stdlib; constructing = loud fail, per the no-fallback policy — NOT a second render path); (b) rapier3d-compat embeds its ~2.2 MB WASM inside rapier.mjs, so vite `manualChunks` isolates it as `rapier-wasm-*` and `perf-probe.mjs` excludes that chunk under the §2 "excl. Rapier WASM" carve-out (D-1). Unused `howler` dep removed. **Gotcha:** after editing the shim, `rm -rf node_modules/.vite` — the dep optimizer inlines the old shim into cached pre-bundles.
    - **Triangles: 985 K/frame at 60 fps** (desktop headless, ~417 draws) — up from 158 K via justified detail only: beveled ExtrudeGeometry floor plates (400, real chamfers), 3,200 20-radial rivets, 6,000 greebles, 100 sagging cables (56×12 tubes), doubled pipe drops, reactor core icosa detail 6 + 28×300 torus rings. **2M hero floor still open** — remaining 2× is a DENSITY-constant turn in `Deck.jsx`; do it at the delta/gate round when godrays+probe-GI fix the real fps budget.
    - **Volumetric shafts SHIPPED** (2026-07-07, battery PASS): GodraysNode raymarched from the reactor's now-shadow-casting glow point light (512² cube shadow; light instance shared to the post stack via `render/lightRegistry.js` ref-callback registry; PostFX rebuilt in an effect so the ref exists — renders plainly until built, never a dead frame). 28 steps, additive composite in reactor hue. Measured: **60 fps, ~521 draws, ~1.35M tris/frame** (cube shadow pass counts) — shot `client/e2e/shots/deck-wip.png`: shafts + bounce read clearly; hologram bloom still blown (delta-round tune).
-   - Still open for the Phase-1 gate: PCSS/contact shadows + probe GI (implement nearest-feasible + DEVIATIONS where honest), mobile-profile measurement, reference-delta round 1 vs `reference/sector9_deck_hero.png`, `--mode assert` wiring, final 2M density turn, then gate-verifier dispatch.
+   - **Shadow/GI deviations formalized + mobile measured** (2026-07-07, battery PASS): D-3 (PCSS + SS-contact → PCFSoft CSM + GTAO grounding, Phase-5 payback via the `shadowNode` filter seam) and D-4 (probe-volume GI → fixture lighting + GTAO; **a real PMREM single-probe bake was BUILT and works visually** — `render/EnvironmentProbe.jsx`, bakes the live deck via `PMREMGenerator.fromScene` → `scene.environment` — but drops 60→1 fps combined with the PostFX scene pass + cube shadows, suspected per-frame pipeline churn, so it is NOT mounted; needs its own debugging round) — both in `docs/DEVIATIONS.md`. **Mobile profile measured (emulated 360×780 dpr1.5): 60 fps median, 1.27M tris** — above the ≥30 fps / ≥0.5M floors (real-device verification is Phase 4's gate; this is a desktop-GPU emulation number, recorded as such).
+   - **Remaining for the Phase-1 gate:** reference-delta round 1 vs `reference/sector9_deck_hero.png` (capture hero shot → 10 ranked gaps → fix top 3 → re-render; includes taming the blown hologram bloom), final 2M density turn under the full stack, `perf-probe --mode assert` wiring into the battery, then gate-verifier dispatch on Phase 1.
 
 ## Gotchas (append-only; newest first)
 

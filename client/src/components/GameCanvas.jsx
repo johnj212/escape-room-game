@@ -129,6 +129,13 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
           fills, sector washes, reactor glow — Pillars C + F. */}
       <Lighting isMobile={isMobile} />
 
+      {/* render/EnvironmentProbe.jsx (baked scene-radiance → environment)
+          is NOT mounted: functionally correct but drops 60 fps → 1 fps
+          under the current stack (suspected per-frame pipeline churn when
+          scene.environment is combined with the PostFX scene pass + cube
+          shadows). Tracked in STATUS.md with D-4 — needs its own debugging
+          round before the fps floor can afford it. */}
+
       <Physics gravity={[0, -9.81, 0]}>
         <Room />
         <WirePuzzle />
