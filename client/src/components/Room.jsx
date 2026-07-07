@@ -1,149 +1,80 @@
-import { useMemo } from 'react'
+import { useMemo, useLayoutEffect } from 'react'
 import { RigidBody } from '@react-three/rapier'
-import * as THREE from 'three'
-import { generateFloorTextures, generateWallTextures, generateReactorTextures } from '../utils/textureGenerator'
+import { Deck } from '../render/Deck'
+import { containmentGlassMaterial, neonMaterial } from '../render/materials'
 
+// Room = physics shell + the security partition. All visual detail lives in
+// render/Deck.jsx (procedural, seeded, TSL materials — Pillar B). Colliders
+// here are collision-only: their meshes are invisible so the deck geometry
+// is the single visual source of truth.
 export const Room = () => {
-  // Memoize textures so they aren't generated/re-instantiated on every re-render
-  const floorTextures = useMemo(() => generateFloorTextures(), [])
-  const wallTextures = useMemo(() => generateWallTextures(), [])
-  const reactorTextures = useMemo(() => generateReactorTextures(), [])
+  const glassMat = useMemo(() => containmentGlassMaterial(), [])
+  const postMat = useMemo(() => neonMaterial({ tint: '#00f3ff', intensity: 2.2 }), [])
 
-  const neonBlueMaterial = useMemo(() => new THREE.MeshStandardMaterial({
-    color: '#00f3ff',
-    emissive: '#00f3ff',
-    emissiveIntensity: 2.2,
-    roughness: 0.1,
-  }), [])
-
-  const neonRedMaterial = useMemo(() => new THREE.MeshStandardMaterial({
-    color: '#ff007f',
-    emissive: '#ff007f',
-    emissiveIntensity: 2.2,
-    roughness: 0.1,
-  }), [])
+  useLayoutEffect(() => {
+    return () => {
+      glassMat.dispose()
+      postMat.dispose()
+    }
+  }, [glassMat, postMat])
 
   return (
     <group>
-      {/* 1. Floor (Static RigidBody) */}
+      {/* Procedural deck visuals (floor plating, walls, pipes, reactor, ...) */}
+      <Deck />
+
+      {/* 1. Floor collider (visuals: Deck floor plates) */}
       <RigidBody type="fixed" colliders="cuboid">
-        <mesh receiveShadow position={[0, -0.1, 0]}>
+        <mesh visible={false} position={[0, -0.1, 0]}>
           <boxGeometry args={[20, 0.2, 20]} />
-          <meshStandardMaterial 
-            {...floorTextures}
-            bumpScale={0.08}
-          />
         </mesh>
       </RigidBody>
 
-      {/* drei <ContactShadows> was removed at the WebGPU swap: it customizes
-          MeshDepthMaterial through WebGL-only hooks and WebGPU's NodeBuilder
-          rejects it every frame ("Material MeshDepthMaterial is not
-          compatible"). Contact grounding returns with the Phase-1 lighting
-          rig (PCSS + screen-space contact shadows per §2). */}
-
-      {/* Decorative Floor Grid Lines */}
-      <gridHelper args={[20, 30, '#00f3ff', '#07090e']} position={[0, 0.01, 0]} />
-
-      {/* 2. Walls (Static Colliders) */}
-      {/* Back Wall */}
+      {/* 2. Wall colliders (visuals: Deck wall panelling). The front wall
+          (z=+10, behind the camera) has always been physics-only so the
+          third-person camera can see into the room — that now holds for all
+          four: visible={false}, collision-only. */}
       <RigidBody type="fixed" colliders="cuboid">
-        <mesh castShadow receiveShadow position={[0, 4, -10]}>
+        <mesh visible={false} position={[0, 4, -10]}>
           <boxGeometry args={[20, 8, 0.5]} />
-          <meshStandardMaterial {...wallTextures} />
         </mesh>
       </RigidBody>
-
-      {/* Left Wall */}
       <RigidBody type="fixed" colliders="cuboid">
-        <mesh castShadow receiveShadow position={[-10, 4, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <mesh visible={false} position={[-10, 4, 0]} rotation={[0, Math.PI / 2, 0]}>
           <boxGeometry args={[20, 8, 0.5]} />
-          <meshStandardMaterial {...wallTextures} />
         </mesh>
       </RigidBody>
-
-      {/* Right Wall */}
       <RigidBody type="fixed" colliders="cuboid">
-        <mesh castShadow receiveShadow position={[10, 4, 0]} rotation={[0, -Math.PI / 2, 0]}>
+        <mesh visible={false} position={[10, 4, 0]} rotation={[0, -Math.PI / 2, 0]}>
           <boxGeometry args={[20, 8, 0.5]} />
-          <meshStandardMaterial {...wallTextures} />
         </mesh>
       </RigidBody>
-
-      {/* Front Wall (behind camera) - Physics only, mesh invisible so camera can see inside */}
       <RigidBody type="fixed" colliders="cuboid" position={[0, 4, 10]} rotation={[0, Math.PI, 0]}>
         <mesh visible={false}>
           <boxGeometry args={[20, 8, 0.5]} />
         </mesh>
       </RigidBody>
 
-      {/* 3. The Security Grid / Laser Fence Partition */}
-      {/* Splits room into left (Engineer) and right (Technician) sectors */}
+      {/* 3. Security partition: splits Engineer (left) / Technician (right)
+          sectors — the physical enforcement of P1's information/action split. */}
       <RigidBody type="fixed" colliders="cuboid">
-        <mesh position={[0, 2, 0]}>
+        <mesh position={[0, 2, 0]} material={glassMat}>
           <boxGeometry args={[0.2, 4, 16]} />
-          <meshPhysicalMaterial
-            color="#00f3ff"
-            emissive="#00f3ff"
-            emissiveIntensity={1.5}
-            transparent
-            opacity={0.18}
-            roughness={0.05}
-            metalness={0.1}
-            transmission={0.95} // High glass refraction
-            thickness={1.5}
-            clearcoat={1.0}
-            clearcoatRoughness={0.02}
-          />
         </mesh>
-        
-        {/* Neon Posts along the partition */}
-        <mesh position={[0, 2, -8]}>
-          <cylinderGeometry args={[0.1, 0.1, 4]} />
-          <primitive object={neonBlueMaterial} attach="material" />
+        <mesh position={[0, 2, -8]} material={postMat}>
+          <cylinderGeometry args={[0.1, 0.1, 4, 16]} />
         </mesh>
-        <mesh position={[0, 2, 8]}>
-          <cylinderGeometry args={[0.1, 0.1, 4]} />
-          <primitive object={neonBlueMaterial} attach="material" />
+        <mesh position={[0, 2, 8]} material={postMat}>
+          <cylinderGeometry args={[0.1, 0.1, 4, 16]} />
         </mesh>
       </RigidBody>
 
-      {/* 4. Reactor Core Cylinder (Static decorative object at the back center) */}
+      {/* 4. Reactor collider (visuals: Deck reactor assembly at z=-9) */}
       <RigidBody type="fixed" colliders="cuboid">
-        <mesh castShadow position={[0, 4, -9]} rotation={[0, 0, 0]}>
-          <cylinderGeometry args={[1.5, 1.5, 8, 32]} />
-          <meshStandardMaterial {...reactorTextures} />
-        </mesh>
-        {/* Glow Core */}
-        <mesh position={[0, 4, -7.4]}>
-          <boxGeometry args={[0.8, 6, 0.2]} />
-          <primitive object={neonRedMaterial} attach="material" />
+        <mesh visible={false} position={[0, 4, -9]}>
+          <cylinderGeometry args={[1.8, 1.8, 8, 12]} />
         </mesh>
       </RigidBody>
-
-      {/* Ceiling decorative piping / trusses */}
-      <mesh position={[0, 7.8, 0]}>
-        <boxGeometry args={[20, 0.2, 0.6]} />
-        <meshStandardMaterial {...wallTextures} />
-      </mesh>
-      <mesh position={[0, 7.8, -5]}>
-        <boxGeometry args={[20, 0.2, 0.6]} />
-        <meshStandardMaterial {...wallTextures} />
-      </mesh>
-      <mesh position={[0, 7.8, 5]}>
-        <boxGeometry args={[20, 0.2, 0.6]} />
-        <meshStandardMaterial {...wallTextures} />
-      </mesh>
-
-      {/* Neon ceiling lighting conduits running along the beams */}
-      <mesh position={[0, 7.68, -4.9]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.03, 0.03, 20, 8]} />
-        <primitive object={neonBlueMaterial} attach="material" />
-      </mesh>
-      <mesh position={[0, 7.68, 4.9]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.03, 0.03, 20, 8]} />
-        <primitive object={neonBlueMaterial} attach="material" />
-      </mesh>
     </group>
   )
 }

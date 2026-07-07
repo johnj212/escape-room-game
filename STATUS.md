@@ -60,20 +60,18 @@ Recorded 2026-07-07 via `node tools/perf-probe.mjs --mode record --profile deskt
 | Metric | Value |
 | --- | --- |
 | fps (median) | 60 |
-| drawCalls (median) | 219 |
-| triangles (median) | 17833 |
-| samples | 29 |
-| JS+CSS gzip, client/dist, excl. .wasm | 1309.7 KB (1341149 bytes) |
+| drawCalls (median) | 283 |
+| triangles (median) | 123677 |
+| samples | 30 |
+| JS+CSS gzip, client/dist, excl. .wasm | 1334.8 KB (1366863 bytes) |
 
 _Record-only until the Phase 1 gate: not yet compared against the §2 floors (desktop >=60fps/>=2M tris/<=500KB gzip, mobile >=30fps/>=0.5M tris). `perf-probe.mjs --mode assert` enforces those floors at Phase 1 close and onward._
-
-_For the before/after: the retired WebGL build measured fps 27 median, 1083.5 KB gzip (2026-07-07, pre-swap). Its recorded drawCalls/triangles (1/2) were an instrumentation artifact — stats were sampled at the wrong point in the frame; see the 2026-07-07 gotcha entry in `docs/R3F-WEBGPU-NOTES.md`._
 ## Next actions
 
 **Phase 0 is closed.** Phase 1 (xhigh — WebGPU render-layer rebuild + Puzzle 1 re-homed) task order:
 
 1. ~~**Dependency migration + WebGPU boot**~~ — **DONE 2026-07-07, battery PASS on the WebGPU build.** react 19.2.7 / fiber 9.6.1 / drei 10.7.7 / rapier 2.2.0 / three 0.185.1 / lucide-react 1.x installed; @react-three/postprocessing removed (unit test now asserts its absence); app renders on `WebGPURenderer` via the async `gl` factory; `puzzle1.spec.js` asserts a live `webgpu` canvas context (and that no WebGL context exists on the same canvas) + full P1 solo-swap solve green on the new stack. Measured on the WebGPU build: **60 fps median, 219 draw calls, 17,833 tris/frame** (headless desktop profile). Three debugging rounds logged in `docs/R3F-WEBGPU-NOTES.md` (StrictMode×async-factory loop kill; drei ContactShadows incompatible; `renderer.info` must be read in `addAfterEffect`). Interim states, deliberate: no post stack yet (task 4), drei Environment preset removed (external HDR — replaced by hemisphere fill until probe GI lands in task 3).
-2. Modular render layer per the brief's structure (`client/src/render/`, `client/src/gpu/`): TSL procedural material library (brushed metal, scratched plating, glass, emissive neon), procedural deck geometry + greebling toward the ≥2M-triangle hero floor.
+2. ~~Modular render layer: TSL materials + procedural deck geometry~~ — **first pass DONE 2026-07-07, battery PASS.** `client/src/render/`: `prng.js` (seeded streams, `?seed=N` §1 determinism), `materials.js` (TSL library: deck plating w/ per-plate variation + seam grime, wall alloy, structural metal, flickering neon, breathing reactor-core plasma, containment glass — all NodeBuilder-clean, zero image files), `Deck.jsx` (instanced procedural deck: 100 floor plates + 400 rivets, panelled walls + ribs + seeded neon strips, pipe runs/drops, 520-greeble field, ceiling trusses + seeded sagging cables, full reactor assembly). Room.jsx is now colliders + partition only — deck visuals are the single visual source of truth; old canvas-texture room retired (generator stays until the WirePuzzle re-home, task 5). Measured: **60 fps, ~288 draws, ~124K tris** (density constants in `Deck.jsx` are the §2 2M-tri tuning knobs — raise during task 3/6 once the lighting rig defines the fps budget). Interim lighting raised to physical units + fog band widened (the old 10–25 band crushed every wall to fog-black); the frame is still visibly darker than the reference — that is task 3's job. WIP shot: `client/e2e/shots/deck-wip.png`.
 3. Lighting rig: 4-cascade CSM ≥2048² + PCSS + screen-space contact shadows (desktop profile), probe-volume GI (compute at load) + GTAO, no-black-shadows law.
 4. Post stack on `PostProcessing` + TSL nodes: bloom, volumetric shafts (GodraysNode), tonemap, vignette, CA — profile-gated.
 5. Asset-free pass: kill the Google-Fonts `@import` + lobby PNG import (or `docs/DEVIATIONS.md` entries); re-home Puzzle 1 with the `isSolo` role bypass at `WirePuzzle.jsx:47` REMOVED + a Pillar-A test proving the solo player must swap Engineer → Technician.

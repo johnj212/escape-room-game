@@ -105,27 +105,32 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
         })
         await renderer.init()
         renderer.toneMapping = THREE.ACESFilmicToneMapping
-        renderer.toneMappingExposure = 1.2
+        renderer.toneMappingExposure = 1.35
         return renderer
       }}
       camera={{ position: [0, 5, 8], fov: 60 }}
     >
+      {/* Fog starts beyond the far wall distance (camera-to-wall runs
+          15-20 m) — the old 10..25 band was crushing every wall to the fog
+          color, which read as black (Pillar C). */}
       <color attach="background" args={['#05060a']} />
-      <fog attach="fog" args={['#05060a', 10, 25]} />
+      <fog attach="fog" args={['#070a12', 16, 46]} />
 
       {/* Interim skylight fill so shadowed metal reads cool, never black
           (Pillar C). Replaces the drei Environment "city" preset, which
           fetched an external HDR at runtime — a Pillar B violation. The
-          real probe-volume GI lands later in Phase 1. */}
-      <hemisphereLight args={['#2a3550', '#0c0e16', 0.55]} />
+          real probe-volume GI lands later in Phase 1. Intensities are in
+          three's physical units (candela for point/spot with decay 2) —
+          the old WebGL-era values read near-black under WebGPU. */}
+      <hemisphereLight args={['#46587e', '#141826', 3.2]} />
 
       {/* Dynamic Cyberpunk Lighting */}
-      <ambientLight intensity={0.15} color="#00f3ff" />
+      <ambientLight intensity={0.55} color="#22525e" />
       
       <directionalLight
         castShadow={!isMobile}
         position={[8, 12, 6]}
-        intensity={1.0}
+        intensity={2.6}
         color="#c9d6ff"
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -142,7 +147,7 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
         position={[0, 7.5, -9]}
         angle={Math.PI / 2.5}
         penumbra={0.9}
-        intensity={6}
+        intensity={140}
         distance={20}
         decay={2}
         color="#ff007f"
@@ -153,7 +158,7 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
       {/* Local lighting above the Engineer's Hologram Console */}
       <pointLight
         position={[-5, 1.6, 0]}
-        intensity={2.5}
+        intensity={38}
         distance={6}
         decay={2}
         color="#00f3ff"
@@ -163,7 +168,7 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
       {/* Local lighting above the Technician's Switch Board */}
       <pointLight
         position={[5, 1.6, 0]}
-        intensity={2.5}
+        intensity={38}
         distance={6}
         decay={2}
         color="#ff007f"
