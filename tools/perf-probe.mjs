@@ -203,8 +203,14 @@ async function buildClientAndMeasureBundle() {
   }
 
   const files = await walkFiles(DIST_DIR)
-  const jsCssFiles = files.filter((f) => /\.(js|css)$/i.test(f) && !/\.wasm$/i.test(f))
-  const wasmFiles = files.filter((f) => /\.wasm$/i.test(f))
+  // The Rapier WASM carve-out (§2 floor "excl. Rapier WASM", D-1) must
+  // follow the binary wherever it ships: rapier3d-compat embeds it inside
+  // its JS, which vite isolates into a `rapier-wasm-*` chunk (vite.config).
+  const isRapierWasmChunk = (f) => /rapier-wasm/i.test(f)
+  const jsCssFiles = files.filter(
+    (f) => /\.(js|css)$/i.test(f) && !/\.wasm$/i.test(f) && !isRapierWasmChunk(f)
+  )
+  const wasmFiles = files.filter((f) => /\.wasm$/i.test(f) || isRapierWasmChunk(f))
 
   let gzipBytes = 0
   for (const f of jsCssFiles) {

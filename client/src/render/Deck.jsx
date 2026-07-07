@@ -22,9 +22,10 @@ import {
 
 const ROOM = { half: 10, height: 8 }
 const DENSITY = {
-  plateDiv: 10, // floor plates per side (plateDiv² plates)
-  greebles: 520, // wall greeble boxes
-  cables: 16, // hanging ceiling cables
+  plateDiv: 20, // floor plates per side (plateDiv² plates)
+  rivetsPerPlate: 8, // corners + edge midpoints
+  greebles: 6000, // wall greeble boxes
+  cables: 100, // hanging ceiling cables
   ribEvery: 2, // wall rib spacing (m)
 }
 
@@ -76,10 +77,11 @@ function buildFloor(seed) {
       const x = -half + size * (ix + 0.5)
       const z = -half + size * (iz + 0.5)
       // Tiny per-plate height jitter sells "worked metal", stays walkable.
-      const y = -0.06 + rng() * 0.008
+      const y = -0.11 + rng() * 0.008
       plates.push({ position: [x, y, z] })
-      const r = size / 2 - 0.13
-      for (const [sx, sz] of [[-r, -r], [r, -r], [-r, r], [r, r]]) {
+      const r = size / 2 - 0.09
+      const spots = [[-r, -r], [r, -r], [-r, r], [r, r], [0, -r], [0, r], [-r, 0], [r, 0]]
+      for (const [sx, sz] of spots.slice(0, DENSITY.rivetsPerPlate)) {
         rivets.push({ position: [x + sx, 0.005, z + sz] })
       }
     }
@@ -150,7 +152,7 @@ function buildPipes(seed) {
       })
     })
     // 4–5 drops per wall at seeded positions.
-    const nDrops = 4 + Math.floor(rng() * 2)
+    const nDrops = 9 + Math.floor(rng() * 3)
     for (let i = 0; i < nDrops; i++) {
       const a = -half + 1.5 + rng() * (half * 2 - 3)
       const [x, , z] = w.at(0.55)
@@ -215,7 +217,7 @@ function buildCeiling(seed) {
       new THREE.Vector3((x0 + x1) / 2, 7.7 - sag, (z0 + z1) / 2),
       new THREE.Vector3(x1, 7.7, z1),
     ])
-    cables.push(new THREE.TubeGeometry(curve, 32, 0.022 + rng() * 0.02, 8, false))
+    cables.push(new THREE.TubeGeometry(curve, 56, 0.022 + rng() * 0.02, 12, false))
   }
   return { beams, cross, cables }
 }
@@ -237,27 +239,40 @@ export const Deck = () => {
   )
 
   const geo = useMemo(() => {
-    const plate = new THREE.BoxGeometry(
-      layout.floor.size - 0.06,
-      0.12,
-      layout.floor.size - 0.06
-    )
+    // Beveled plate: REAL chamfered edges that catch light at every seam —
+    // justified tessellation, not flat-quad padding.
+    const half = (layout.floor.size - 0.06) / 2
+    const shape = new THREE.Shape()
+    shape.moveTo(-half, -half)
+    shape.lineTo(half, -half)
+    shape.lineTo(half, half)
+    shape.lineTo(-half, half)
+    shape.closePath()
+    const plate = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.09,
+      bevelEnabled: true,
+      bevelThickness: 0.018,
+      bevelSize: 0.02,
+      bevelSegments: 2,
+    })
+    plate.rotateX(-Math.PI / 2)
+    plate.translate(0, 0.11, 0)
     return {
       plate,
-      rivet: new THREE.CylinderGeometry(0.028, 0.032, 0.024, 12),
+      rivet: new THREE.CylinderGeometry(0.028, 0.034, 0.026, 20),
       panel: new THREE.BoxGeometry(DENSITY.ribEvery - 0.18, 3.6, 0.1),
       rib: new THREE.BoxGeometry(0.16, ROOM.height - 0.5, 0.22),
       rail: new THREE.BoxGeometry(ROOM.half * 2 - 0.2, 0.14, 0.1),
       strip: new THREE.BoxGeometry(0.05, ROOM.height - 1.6, 0.04),
-      pipe: new THREE.CylinderGeometry(0.055, 0.055, 1, 12, 1, true),
-      joint: new THREE.SphereGeometry(0.085, 12, 10),
+      pipe: new THREE.CylinderGeometry(0.055, 0.055, 1, 20, 1, true),
+      joint: new THREE.SphereGeometry(0.085, 18, 14),
       greeble: new THREE.BoxGeometry(1, 1, 1),
       beam: new THREE.BoxGeometry(1, 0.22, 0.5),
-      conduit: new THREE.CylinderGeometry(0.03, 0.03, ROOM.half * 2, 10),
-      reactorBase: new THREE.CylinderGeometry(2.3, 2.55, 0.6, 48),
-      reactorGlass: new THREE.CylinderGeometry(1.5, 1.5, 6.2, 48, 1, true),
-      reactorCore: new THREE.IcosahedronGeometry(0.95, 4),
-      reactorRing: new THREE.TorusGeometry(1.68, 0.07, 14, 72),
+      conduit: new THREE.CylinderGeometry(0.03, 0.03, ROOM.half * 2, 16),
+      reactorBase: new THREE.CylinderGeometry(2.3, 2.55, 0.6, 96),
+      reactorGlass: new THREE.CylinderGeometry(1.5, 1.5, 6.2, 96, 1, true),
+      reactorCore: new THREE.IcosahedronGeometry(0.95, 6),
+      reactorRing: new THREE.TorusGeometry(1.68, 0.07, 28, 300),
       reactorStrut: new THREE.BoxGeometry(0.14, 6.4, 0.2),
       reactorDuct: new THREE.CylinderGeometry(0.75, 1.0, 1.6, 32),
     }
