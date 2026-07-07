@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import { useGameStore } from '../store/gameStore'
 import { Lighting } from '../render/Lighting'
+import { PostFX } from '../render/PostFX'
 import { Room } from './Room'
 import { Player } from './Player'
 import { WirePuzzle } from './WirePuzzle'
@@ -147,10 +148,9 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
       <CameraFollow />
       <PerfProbe />
 
-      {/* Post stack: rebuilt on three/webgpu PostProcessing + TSL display
-          nodes later in Phase 1 (@react-three/postprocessing was WebGL-only
-          and is removed). Interim state: no post — tracked in STATUS.md as
-          an open Phase-1 task, not a dropped floor. */}
+      {/* Post stack (render/PostFX.jsx): GTAO + bloom + CA + vignette on
+          three/webgpu PostProcessing + TSL display nodes, profile-gated. */}
+      <PostFX isMobile={isMobile} />
 
       {/* Low-spec helpers to adapt performance */}
       <AdaptiveDpr pixelated />
