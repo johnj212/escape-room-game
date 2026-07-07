@@ -76,28 +76,31 @@ test.describe('App boot + solo-swap solve of Puzzle 1 (Decoupled Power Grid)', (
     await expect(launchButton).toBeVisible()
     await launchButton.click()
 
-    // 2. Game canvas mounts and has a genuinely live render context.
+    // 2. Game canvas mounts and holds a live WEBGPU context (Phase 1: the
+    // app renders on three.js WebGPURenderer — no WebGL fallback exists).
+    // Re-requesting 'webgpu' on an already-configured canvas returns the
+    // existing GPUCanvasContext per spec; requesting a WebGL context on it
+    // would return null, which doubles as a no-second-render-path check.
     const canvas = page.locator('canvas')
     await expect(canvas).toBeVisible()
     const contextInfo = await page.evaluate(() => {
       const el = document.querySelector('canvas')
       if (!el) return { found: false }
-      // R3F v8 / three.js WebGLRenderer creates a 'webgl2' context. Re-requesting
-      // the same context type on an already-initialized canvas returns the
-      // existing live context per spec (it does not create a new one).
-      const gl = el.getContext('webgl2') || el.getContext('webgl')
-      if (!gl) return { found: true, live: false }
+      const gpuCtx = el.getContext('webgpu')
+      const glCtx = el.getContext('webgl2') || el.getContext('webgl')
       return {
         found: true,
-        live: true,
-        drawingBufferWidth: gl.drawingBufferWidth,
-        drawingBufferHeight: gl.drawingBufferHeight,
+        webgpu: !!gpuCtx,
+        webglOnSameCanvas: !!glCtx,
+        width: el.width,
+        height: el.height,
       }
     })
     expect(contextInfo.found).toBe(true)
-    expect(contextInfo.live).toBe(true)
-    expect(contextInfo.drawingBufferWidth).toBeGreaterThan(0)
-    expect(contextInfo.drawingBufferHeight).toBeGreaterThan(0)
+    expect(contextInfo.webgpu).toBe(true)
+    expect(contextInfo.webglOnSameCanvas).toBe(false)
+    expect(contextInfo.width).toBeGreaterThan(0)
+    expect(contextInfo.height).toBeGreaterThan(0)
 
     // Confirm the store actually transitioned into the playing phase (server-free
     // in solo mode: useMultiplayer disconnects the socket entirely when isSolo).

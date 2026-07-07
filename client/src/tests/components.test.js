@@ -25,12 +25,17 @@ describe('Component and Dependency Audits', () => {
     expect(hasInvisibleFrontWall).toBe(true)
   })
 
-  it('should ensure package.json specifies a compatible @react-three/postprocessing version for R3F v8', () => {
+  it('should ensure the WebGPU-era dependency matrix holds (fiber 9 + react 19, no WebGL-only postprocessing wrapper)', () => {
     const filePath = path.resolve(__dirname, '../../package.json')
     const pkg = JSON.parse(fs.readFileSync(filePath, 'utf8'))
-    
-    const postVersion = pkg.dependencies['@react-three/postprocessing']
-    // Must be version 2.x to match R3F v8 and avoid "length" of undefined crashes
-    expect(postVersion).toBe('^2.16.2')
+
+    // @react-three/postprocessing wraps the WebGL-only `postprocessing`
+    // library — it must NOT return: the Phase-1 post stack is three/webgpu's
+    // own PostProcessing + TSL display nodes (docs/R3F-WEBGPU-NOTES.md).
+    expect(pkg.dependencies['@react-three/postprocessing']).toBeUndefined()
+
+    // The WebGPU render path requires fiber v9, which peer-requires react 19.
+    expect(pkg.dependencies['@react-three/fiber']).toMatch(/^\^?9\./)
+    expect(pkg.dependencies['react']).toMatch(/^\^?19\./)
   })
 })

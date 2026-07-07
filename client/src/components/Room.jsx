@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
 import { RigidBody } from '@react-three/rapier'
-import { ContactShadows } from '@react-three/drei'
 import * as THREE from 'three'
 import { generateFloorTextures, generateWallTextures, generateReactorTextures } from '../utils/textureGenerator'
 
@@ -37,14 +36,11 @@ export const Room = () => {
         </mesh>
       </RigidBody>
 
-      {/* Contact Shadows for soft ambient occlusion underneath characters & props */}
-      <ContactShadows
-        position={[0, 0.015, 0]}
-        opacity={0.8}
-        scale={20}
-        blur={1.6}
-        far={3}
-      />
+      {/* drei <ContactShadows> was removed at the WebGPU swap: it customizes
+          MeshDepthMaterial through WebGL-only hooks and WebGPU's NodeBuilder
+          rejects it every frame ("Material MeshDepthMaterial is not
+          compatible"). Contact grounding returns with the Phase-1 lighting
+          rig (PCSS + screen-space contact shadows per §2). */}
 
       {/* Decorative Floor Grid Lines */}
       <gridHelper args={[20, 30, '#00f3ff', '#07090e']} position={[0, 0.01, 0]} />

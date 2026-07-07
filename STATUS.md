@@ -53,24 +53,26 @@ Phase 0 in progress. Operating files scaffolded (this file, `docs/DELTA.md`, `do
 
 **Perf HUD SHIPPED + R3F v9 path CONFIRMED** (2026-07-07): `client/src/components/PerfHud.jsx` — visible layer over the existing `window.__PERF__` feed (F3 toggle / `?hud=1`, fps color-coded against the 30/60 floors); e2e-verified in `puzzle1.spec.js` (toggles on, reports live fps > 0, toggles off) — battery PASS. R3F v9 + `WebGPURenderer` integration path verified against installed source in a scratch install (fiber 9.6.1 / three 0.185.1): async `gl` factory awaited by fiber, factory must call `await renderer.init()`, **React 19 required**, full Phase-1 dep matrix + the finding that `@react-three/postprocessing` should be dropped for three's own `PostProcessing` + TSL display nodes — all in `docs/R3F-WEBGPU-NOTES.md` (2026-07-07 entry). **All Phase 0 deliverables now built; gate-verifier dispatch is the only step left before closing Phase 0.**
 
-## Phase-0 baseline (WebGL)
+## Render baseline (WebGPU, auto-recorded)
 
-Recorded 2026-07-07 via `node tools/perf-probe.mjs --mode record --profile desktop` (pre-Phase-1 R3F v8 WebGLRenderer build, 1440x810 dpr2).
+Recorded 2026-07-07 via `node tools/perf-probe.mjs --mode record --profile desktop` (R3F v9 WebGPURenderer build, 1440x810 dpr2).
 
 | Metric | Value |
 | --- | --- |
-| fps (median) | 27 |
-| drawCalls (median) | 1 |
-| triangles (median) | 2 |
+| fps (median) | 60 |
+| drawCalls (median) | 219 |
+| triangles (median) | 17833 |
 | samples | 29 |
-| JS+CSS gzip, client/dist, excl. .wasm | 1083.5 KB (1109500 bytes) |
+| JS+CSS gzip, client/dist, excl. .wasm | 1309.7 KB (1341149 bytes) |
 
-_Phase 0 records the current WebGL numbers only — not compared against the WebGPU floors in `Project_Requirements.md` §2 (desktop >=60fps/>=2M tris/<=500KB gzip, mobile >=30fps/>=0.5M tris). `perf-probe.mjs --mode assert` enforces those floors from Phase 1 onward._
+_Record-only until the Phase 1 gate: not yet compared against the §2 floors (desktop >=60fps/>=2M tris/<=500KB gzip, mobile >=30fps/>=0.5M tris). `perf-probe.mjs --mode assert` enforces those floors at Phase 1 close and onward._
+
+_For the before/after: the retired WebGL build measured fps 27 median, 1083.5 KB gzip (2026-07-07, pre-swap). Its recorded drawCalls/triangles (1/2) were an instrumentation artifact — stats were sampled at the wrong point in the frame; see the 2026-07-07 gotcha entry in `docs/R3F-WEBGPU-NOTES.md`._
 ## Next actions
 
 **Phase 0 is closed.** Phase 1 (xhigh — WebGPU render-layer rebuild + Puzzle 1 re-homed) task order:
 
-1. **Dependency migration** (all peer-locked together, verified matrix in `docs/R3F-WEBGPU-NOTES.md` 2026-07-07): react/react-dom 19, @react-three/fiber 9, drei 10, rapier 2; **remove** @react-three/postprocessing (WebGL-only — replaced by `three/webgpu` `PostProcessing` + TSL display nodes); three latest. Get the app booting on `WebGPURenderer` via the async `gl` factory (`await renderer.init()`), swap `puzzle1.spec.js`'s app-boot assertion WebGL → WebGPU, battery green.
+1. ~~**Dependency migration + WebGPU boot**~~ — **DONE 2026-07-07, battery PASS on the WebGPU build.** react 19.2.7 / fiber 9.6.1 / drei 10.7.7 / rapier 2.2.0 / three 0.185.1 / lucide-react 1.x installed; @react-three/postprocessing removed (unit test now asserts its absence); app renders on `WebGPURenderer` via the async `gl` factory; `puzzle1.spec.js` asserts a live `webgpu` canvas context (and that no WebGL context exists on the same canvas) + full P1 solo-swap solve green on the new stack. Measured on the WebGPU build: **60 fps median, 219 draw calls, 17,833 tris/frame** (headless desktop profile). Three debugging rounds logged in `docs/R3F-WEBGPU-NOTES.md` (StrictMode×async-factory loop kill; drei ContactShadows incompatible; `renderer.info` must be read in `addAfterEffect`). Interim states, deliberate: no post stack yet (task 4), drei Environment preset removed (external HDR — replaced by hemisphere fill until probe GI lands in task 3).
 2. Modular render layer per the brief's structure (`client/src/render/`, `client/src/gpu/`): TSL procedural material library (brushed metal, scratched plating, glass, emissive neon), procedural deck geometry + greebling toward the ≥2M-triangle hero floor.
 3. Lighting rig: 4-cascade CSM ≥2048² + PCSS + screen-space contact shadows (desktop profile), probe-volume GI (compute at load) + GTAO, no-black-shadows law.
 4. Post stack on `PostProcessing` + TSL nodes: bloom, volumetric shafts (GodraysNode), tonemap, vignette, CA — profile-gated.
@@ -80,6 +82,10 @@ _Phase 0 records the current WebGL numbers only — not compared against the Web
 ## Gotchas (append-only; newest first)
 
 _(Carry forward the hard-won ones from `handoff.md` as they recur under the new stack; add new ones here rather than re-debugging.)_
+
+- React 19 `<StrictMode>` + fiber v9 async WebGPU `gl` factory = frame loop freezes after first frame, zero errors. StrictMode is off in `main.jsx` on purpose. Full writeup: `docs/R3F-WEBGPU-NOTES.md` 2026-07-07.
+- Read `renderer.info` in `addAfterEffect`, never `useFrame`, under WebGPU — the renderer's internal Animation loop resets Info every tick and pre-render reads report zeros. Per-frame draws = `info.render.drawCalls` (not `calls`).
+- drei `<ContactShadows>` (and anything customizing materials via WebGL hooks) fails NodeBuilder under WebGPU with per-frame console errors that also tank fps.
 
 - Rapier rigid-body `type` transitions are async — `linvel()` can return `NaN` on the first frame after a solo-swap type change. Guard velocity/position reads against `NaN` before writing to the store, or the camera-follow lerp propagates `NaN` into a permanent black screen. (from `handoff.md`)
 - Third-person camera can clip through/behind room walls; keep boundary colliders but handle the visual so the camera never renders from inside an opaque mesh. Revisit under the WebGPU renderer. (from `handoff.md`)

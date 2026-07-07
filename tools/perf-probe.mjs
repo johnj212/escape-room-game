@@ -237,7 +237,7 @@ function printTable(profileName, perf, bundle) {
   ]
   const width = Math.max(...rows.map(([k]) => k.length))
   console.log('')
-  console.log('Phase-0 perf-probe results (WebGL, current pre-Phase-1 build)')
+  console.log('perf-probe results (WebGPU build, Phase 1)')
   console.log('-'.repeat(width + 20))
   for (const [k, v] of rows) {
     console.log(`${k.padEnd(width)} : ${v}`)
@@ -248,10 +248,10 @@ function printTable(profileName, perf, bundle) {
 function buildStatusBlock(profileName, perf, bundle) {
   const date = new Date().toISOString().slice(0, 10)
   return [
-    '## Phase-0 baseline (WebGL)',
+    '## Render baseline (WebGPU, auto-recorded)',
     '',
     `Recorded ${date} via \`node tools/perf-probe.mjs --mode record --profile ${profileName}\` ` +
-      `(pre-Phase-1 R3F v8 WebGLRenderer build, ${PROFILES[profileName].width}x${PROFILES[profileName].height} ` +
+      `(R3F v9 WebGPURenderer build, ${PROFILES[profileName].width}x${PROFILES[profileName].height} ` +
       `dpr${PROFILES[profileName].deviceScaleFactor}).`,
     '',
     '| Metric | Value |',
@@ -262,16 +262,16 @@ function buildStatusBlock(profileName, perf, bundle) {
     `| samples | ${perf.sampleCount} |`,
     `| JS+CSS gzip, client/dist, excl. .wasm | ${formatBytes(bundle.gzipBytes)} (${bundle.gzipBytes} bytes) |`,
     '',
-    '_Phase 0 records the current WebGL numbers only — not compared against the WebGPU floors ' +
-      'in `Project_Requirements.md` §2 (desktop >=60fps/>=2M tris/<=500KB gzip, mobile ' +
-      '>=30fps/>=0.5M tris). `perf-probe.mjs --mode assert` enforces those floors from Phase 1 onward._',
+    '_Record-only until the Phase 1 gate: not yet compared against the §2 floors ' +
+      '(desktop >=60fps/>=2M tris/<=500KB gzip, mobile >=30fps/>=0.5M tris). ' +
+      '`perf-probe.mjs --mode assert` enforces those floors at Phase 1 close and onward._',
     '',
   ].join('\n')
 }
 
 function writeStatusBlock(block) {
   const original = fs.readFileSync(STATUS_PATH, 'utf8')
-  const headingRe = /^## Phase-0 baseline \(WebGL\)\s*$/m
+  const headingRe = /^## (?:Phase-0 baseline \(WebGL\)|Render baseline \(WebGPU, auto-recorded\))\s*$/m
 
   if (headingRe.test(original)) {
     // Replace the existing block: from this heading up to (not including) the next top-level
