@@ -13,7 +13,7 @@ export const LoadingScreen = () => {
       </div>
       
       <div style={{
-        fontFamily: 'Orbitron',
+        fontFamily: 'var(--font-hud)',
         fontSize: '0.85rem',
         color: 'var(--neon-cyan)',
         textShadow: '0 0 5px var(--neon-cyan-glow)'

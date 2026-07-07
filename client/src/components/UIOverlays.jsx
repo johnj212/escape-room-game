@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Monitor, Compass, Shield, RefreshCw, Power } from 'lucide-react'
 import nipplejs from 'nipplejs'
 import { useGameStore } from '../store/gameStore'
-import lobbyBg from '../assets/sector_9_deck_1779639466019.png'
 
 export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) => {
   const gamePhase = useGameStore((state) => state.gamePhase)
@@ -114,11 +113,7 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
     const myPlayer = players[myPlayerId]
 
     return (
-      <div className="overlay-screen" style={{
-        backgroundImage: `linear-gradient(rgba(10, 11, 16, 0.7), rgba(5, 6, 10, 0.88)), url(${lobbyBg})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}>
+      <div className="overlay-screen overlay-backdrop">
         <h1 className="overlay-title">Sector-9 Command Deck</h1>
         <p className="overlay-subtitle">Cyberpunk Multi-operator Escape Grid</p>
 
@@ -144,7 +139,7 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
             // Multiplayer Config
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' }}>
               <div style={{ textAlign: 'left' }}>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontFamily: 'Orbitron' }}>Operator Name</label>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontFamily: 'var(--font-hud)' }}>Operator Name</label>
                 <input
                   type="text"
                   placeholder="Enter Name"
@@ -156,7 +151,7 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
               </div>
 
               <div style={{ textAlign: 'left' }}>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontFamily: 'Orbitron' }}>Choose System Role</label>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontFamily: 'var(--font-hud)' }}>Choose System Role</label>
                 <div className="lobby-role-selection">
                   <button
                     className={`lobby-role-btn role-engineer ${selectedRole === 'engineer' ? 'selected' : ''}`}
@@ -215,7 +210,7 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
                 // Inside room waiting lobby
                 <div>
                   <div style={{
-                    fontFamily: 'Orbitron',
+                    fontFamily: 'var(--font-hud)',
                     fontSize: '1.2rem',
                     color: 'var(--neon-cyan)',
                     background: 'rgba(0,0,0,0.4)',
@@ -227,13 +222,13 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
                     GRID SECURE: {roomId}
                   </div>
 
-                  <h3 style={{ textAlign: 'left', fontSize: '0.8rem', fontFamily: 'Orbitron', marginBottom: '8px', color: 'var(--text-secondary)' }}>CONNECTED OPERATORS</h3>
+                  <h3 style={{ textAlign: 'left', fontSize: '0.8rem', fontFamily: 'var(--font-hud)', marginBottom: '8px', color: 'var(--text-secondary)' }}>CONNECTED OPERATORS</h3>
                   <div className="lobby-player-list">
                     {lobbyPlayers.map((p) => (
                       <div key={p.id} className={`lobby-player-row ${p.isReady ? 'ready' : ''}`}>
                         <span style={{ fontSize: '0.9rem' }}>{p.name} ({p.role.toUpperCase()})</span>
                         <span style={{
-                          fontFamily: 'Orbitron',
+                          fontFamily: 'var(--font-hud)',
                           fontSize: '0.75rem',
                           color: p.isReady ? 'var(--neon-green)' : 'var(--text-secondary)'
                         }}>
@@ -355,11 +350,7 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
 
       {/* Game Over Screen (Win/Lose Modal) */}
       {(gamePhase === 'win' || gamePhase === 'lose') && (
-        <div className="overlay-screen" style={{
-          backgroundImage: `linear-gradient(rgba(10, 11, 16, 0.75), rgba(5, 6, 10, 0.9)), url(${lobbyBg})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}>
+        <div className="overlay-screen overlay-backdrop">
           <h1 className="overlay-title" style={{ color: gamePhase === 'win' ? '#39ff14' : '#ff3131' }}>
             {gamePhase === 'win' ? 'GRID SYNCHRONIZED' : 'REACTOR MELTDOWN'}
           </h1>

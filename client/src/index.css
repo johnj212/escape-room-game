@@ -1,4 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap');
+/* Zero external assets in the play route (Pillar B): no webfont fetch.
+   The HUD voice comes from wide-tracked, uppercase system faces instead of
+   the old Google-Fonts Orbitron/Inter import — logged as D-2 in
+   docs/DEVIATIONS.md. */
 
 :root {
   /* Colors */
@@ -21,9 +24,11 @@
   --text-secondary: #8f9cae;
   --text-muted: #4e5b6c;
   
-  /* Fonts */
-  --font-hud: 'Orbitron', sans-serif;
-  --font-ui: 'Inter', sans-serif;
+  /* Fonts — system stacks only (no webfont in the critical path) */
+  --font-hud: 'Avenir Next Condensed', 'Futura', 'Segoe UI', 'Roboto Condensed',
+    ui-sans-serif, system-ui, sans-serif;
+  --font-ui: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', sans-serif;
   
   /* Glassmorphism */
   --glass-border: rgba(255, 255, 255, 0.08);
@@ -60,6 +65,24 @@ canvas {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* Procedural lobby/game-over backdrop — replaces the 973 KB PNG import
+   (Pillar B: zero shipped images). Layered CSS: deep radial vignette,
+   sector-colored glow pools, and a scanline field. */
+.overlay-backdrop {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 243, 255, 0.012) 0px,
+      rgba(0, 243, 255, 0.012) 1px,
+      transparent 1px,
+      transparent 4px
+    ),
+    radial-gradient(ellipse 60% 45% at 18% 82%, rgba(0, 243, 255, 0.1), transparent 60%),
+    radial-gradient(ellipse 55% 40% at 84% 78%, rgba(255, 0, 127, 0.09), transparent 60%),
+    radial-gradient(ellipse 50% 38% at 50% 6%, rgba(255, 90, 42, 0.12), transparent 65%),
+    radial-gradient(ellipse 90% 80% at 50% 50%, #10131d 0%, #07090f 55%, #04050a 100%);
 }
 
 /* Glassmorphism UI Panels */

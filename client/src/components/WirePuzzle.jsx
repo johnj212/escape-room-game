@@ -5,10 +5,17 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '../store/gameStore'
 import { generateWallTextures } from '../utils/textureGenerator'
+import {
+  switchboardAccess,
+  cipherLegible as cipherLegibleGate,
+  SWITCHBOARD_RANGE,
+  RANGE_HYSTERESIS,
+} from '../game/roleGates'
 
 export const WirePuzzle = () => {
   const isSolo = useGameStore((state) => state.isSolo)
   const activePlayerId = useGameStore((state) => state.activePlayerId)
+  const myPlayerId = useGameStore((state) => state.myPlayerId)
   const players = useGameStore((state) => state.players)
   const puzzleState = useGameStore((state) => state.puzzleState)
   const toggleSwitch = useGameStore((state) => state.toggleSwitch)
@@ -16,11 +23,21 @@ export const WirePuzzle = () => {
 
   const [nearSwitchBoard, setNearSwitchBoard] = useState(false)
   const [showSwitchBoardUI, setShowSwitchBoardUI] = useState(false)
-  
+  const [roleLocked, setRoleLocked] = useState(false)
+  const [cipherLegible, setCipherLegible] = useState(false)
+
   const hologramRef = useRef(null)
   const scanLineRef = useRef(null)
 
   const consoleTextures = useMemo(() => generateWallTextures(), [])
+
+  // Pillar A (P1 = 2 roles): the puzzle splits INFORMATION (Engineer's
+  // sightline on the cipher hologram) from ACTION (Technician's switchboard).
+  // The viewing character is the solo-swap active character offline, or this
+  // client's own player online — sightline and control NEVER collapse into
+  // one character; the old `|| isSolo` role bypass is gone (brief amendment
+  // 2026-07-04, STATUS.md).
+  const viewerId = isSolo ? activePlayerId : myPlayerId
 
   // Floating hologram and scanline animation
   useFrame((state) => {
@@ -34,24 +51,29 @@ export const WirePuzzle = () => {
     }
   })
 
-  // Detect player proximity to switch board
+  // Proximity + role gates for both consoles, evaluated for the VIEWER
+  // through the pure Pillar-A rules in game/roleGates.js (unit-tested for
+  // every role × range combination — no solo exemption exists).
   useFrame(() => {
-    const activePlayer = players[activePlayerId]
-    if (!activePlayer || !activePlayer.position) return
+    const viewer = players[viewerId]
+    if (!viewer || !viewer.position) return
 
-    const [px, , pz] = activePlayer.position
-    // Terminal position: [5, 0.5, 0]
-    const distance = Math.sqrt((px - 5) ** 2 + (pz - 0) ** 2)
-    
-    // Check if player has role of technician (or solo mode) to access the board
-    const isTechnician = activePlayer.role === 'technician' || isSolo
-    
-    if (distance < 2 && isTechnician && gamePhase === 'playing') {
+    // Hysteresis: an open terminal stays interactable slightly past the
+    // approach radius, so momentum drift can't flap it shut mid-click.
+    const range = showSwitchBoardUI
+      ? SWITCHBOARD_RANGE + RANGE_HYSTERESIS
+      : SWITCHBOARD_RANGE
+    const access = switchboardAccess(viewer, gamePhase, range)
+    if (access === 'open') {
       setNearSwitchBoard(true)
+      setRoleLocked(false)
     } else {
       setNearSwitchBoard(false)
       setShowSwitchBoardUI(false)
+      setRoleLocked(access === 'role-locked')
     }
+
+    setCipherLegible(cipherLegibleGate(viewer, gamePhase))
   })
 
   // Listen to spacebar to open terminal when near
@@ -151,25 +173,37 @@ export const WirePuzzle = () => {
           <meshBasicMaterial color="#00f3ff" transparent opacity={0.65} />
         </mesh>
 
-        {/* 3 Hologram Wires reflecting the cipher */}
-        {puzzleState.cipher.map((color, index) => (
-          <mesh key={index} position={[0, 0.3 - index * 0.3, 0.03]}>
-            <boxGeometry args={[1.2, 0.08, 0.02]} />
-            <meshBasicMaterial color={getColorHex(color)} transparent opacity={0.8} blending={THREE.AdditiveBlending} />
-          </mesh>
-        ))}
+        {/* Cipher wires — legible ONLY through the Engineer's eyes in
+            projector range (Pillar A information gate). Everyone else sees
+            encrypted static. */}
+        {cipherLegible
+          ? puzzleState.cipher.map((color, index) => (
+              <mesh key={index} position={[0, 0.3 - index * 0.3, 0.03]}>
+                <boxGeometry args={[1.2, 0.08, 0.02]} />
+                <meshBasicMaterial color={getColorHex(color)} transparent opacity={0.8} blending={THREE.AdditiveBlending} />
+              </mesh>
+            ))
+          : [0, 1, 2].map((index) => (
+              <mesh key={index} position={[0, 0.3 - index * 0.3, 0.03]}>
+                <boxGeometry args={[1.2, 0.08, 0.02]} />
+                <meshBasicMaterial color="#3b4553" transparent opacity={0.45} blending={THREE.AdditiveBlending} />
+              </mesh>
+            ))}
 
         <Html position={[0, 0.6, 0]} center>
-          <div style={{
-            fontFamily: 'Orbitron',
-            fontSize: '0.65rem',
-            color: '#00f3ff',
-            textShadow: '0 0 5px rgba(0,243,255,0.8)',
-            letterSpacing: '1px',
-            whiteSpace: 'nowrap',
-            textTransform: 'uppercase'
-          }}>
-            SECURITY OVERRIDE CODE
+          <div
+            data-testid="hologram-label"
+            style={{
+              fontFamily: 'var(--font-hud)',
+              fontSize: '0.65rem',
+              color: cipherLegible ? '#00f3ff' : '#8f9cae',
+              textShadow: cipherLegible ? '0 0 5px rgba(0,243,255,0.8)' : 'none',
+              letterSpacing: '1px',
+              whiteSpace: 'nowrap',
+              textTransform: 'uppercase'
+            }}
+          >
+            {cipherLegible ? 'SECURITY OVERRIDE CODE' : 'SIGNAL ENCRYPTED :: ENGINEER CLEARANCE'}
           </div>
         </Html>
       </group>
@@ -250,22 +284,53 @@ export const WirePuzzle = () => {
       })}
 
 
-      {/* Proximity HUD Alert & HTML Switch Board Overlay */}
-      {nearSwitchBoard && (
+      {/* Role lock: a non-Technician in switchboard range gets a refusal,
+          never the terminal (Pillar A action gate — no solo exemption). */}
+      {roleLocked && (
         <Html position={[5, 1.5, 0]} center>
-          {!showSwitchBoardUI ? (
-            <div className="glass-panel" style={{
+          <div
+            data-testid="switchboard-role-lock"
+            className="glass-panel"
+            style={{
               padding: '10px 15px',
-              fontFamily: 'Orbitron',
+              fontFamily: 'var(--font-hud)',
               fontSize: '0.8rem',
               whiteSpace: 'nowrap',
-              pointerEvents: 'auto',
-              cursor: 'pointer'
-            }} onClick={() => setShowSwitchBoardUI(true)}>
-              Press <span style={{ color: '#00f3ff', fontWeight: 'bold' }}>SPACE / TAP</span> to access grid
-            </div>
-          ) : (
-            <div className="glass-panel puzzle-mobile-overlay" style={{
+              color: '#ff3131',
+              border: '1px solid rgba(255,49,49,0.5)'
+            }}
+          >
+            ROLE LOCK — TECHNICIAN CLEARANCE REQUIRED
+          </div>
+        </Html>
+      )}
+
+      {/* Proximity prompt: world-anchored above the console. */}
+      {nearSwitchBoard && !showSwitchBoardUI && (
+        <Html position={[5, 1.5, 0]} center>
+          <div className="glass-panel" style={{
+            padding: '10px 15px',
+            fontFamily: 'var(--font-hud)',
+            fontSize: '0.8rem',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'auto',
+            cursor: 'pointer'
+          }} onClick={() => setShowSwitchBoardUI(true)}>
+            Press <span style={{ color: '#00f3ff', fontWeight: 'bold' }}>SPACE / TAP</span> to access grid
+          </div>
+        </Html>
+      )}
+
+      {/* Open terminal: a SCREEN-FIXED takeover, not 3D-tracked — a diegetic
+          terminal you're "jacked into". Fixed positioning also means camera
+          micro-motion (droid hover bob) can't jitter the click targets. */}
+      {nearSwitchBoard && showSwitchBoardUI && (
+        <Html
+          position={[5, 1.5, 0]}
+          center
+          calculatePosition={(el, camera, size) => [size.width / 2, size.height * 0.42]}
+        >
+          <div className="glass-panel puzzle-mobile-overlay" style={{
               width: '280px',
               height: 'auto',
               pointerEvents: 'auto',
@@ -293,7 +358,7 @@ export const WirePuzzle = () => {
                         width: '20px',
                         height: '20px'
                       }}></div>
-                      <span style={{ fontSize: '0.75rem', fontFamily: 'Orbitron', textTransform: 'uppercase' }}>
+                      <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-hud)', textTransform: 'uppercase' }}>
                         {color}
                       </span>
                     </div>
@@ -307,13 +372,12 @@ export const WirePuzzle = () => {
                   fontSize: '0.8rem',
                   fontWeight: 'bold',
                   textAlign: 'center',
-                  fontFamily: 'Orbitron'
+                  fontFamily: 'var(--font-hud)'
                 }}>
                   GRID SYNCHRONIZED
                 </div>
               )}
             </div>
-          )}
         </Html>
       )}
     </group>

@@ -123,7 +123,12 @@ test.describe('App boot + solo-swap solve of Puzzle 1 (Decoupled Power Grid)', (
     await page.keyboard.press('F3')
     await expect(page.getByTestId('perf-hud')).toHaveCount(0)
 
-    // 3. Read the cipher the Engineer's hologram displays (Puzzle 1's
+    // 3. Pillar A information gate: the active character is P1 (Engineer),
+    // who spawns within the projector's reading range — the hologram label
+    // must show the legible state THROUGH THE ENGINEER'S EYES.
+    await expect(page.getByTestId('hologram-label')).toHaveText('SECURITY OVERRIDE CODE')
+
+    // Read the cipher the Engineer's hologram displays (Puzzle 1's
     // "information" half) directly from authoritative client state - this is a
     // read-only assertion of what the hologram shows, not a solve shortcut.
     const cipher = await page.evaluate(() => window.useGameStore.getState().puzzleState.cipher)
@@ -134,6 +139,14 @@ test.describe('App boot + solo-swap solve of Puzzle 1 (Decoupled Power Grid)', (
     // half of the puzzle (the switchboard). This is the co-op-in-one-body
     // mechanic Pillar E requires for solo play.
     await page.keyboard.press('2')
+
+    // Pillar A: the moment the viewer is no longer the Engineer, the cipher
+    // reads as encrypted static — solo-swap gets no information exemption.
+    // (The role-gate unit suite in src/tests/roleGates.test.js enumerates
+    // every role × range combination, including the switchboard role-lock.)
+    await expect(page.getByTestId('hologram-label')).toHaveText(
+      'SIGNAL ENCRYPTED :: ENGINEER CLEARANCE'
+    )
     await expect
       .poll(() => page.evaluate(() => window.useGameStore.getState().activePlayerId))
       .toBe('player-2')
