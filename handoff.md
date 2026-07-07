@@ -7,75 +7,79 @@
 
 ---
 
-## 0. Current session handoff (2026-07-04) — READ FIRST
+## 0. Current session handoff (2026-07-07) — READ FIRST
 
 ### Rehydration (do this before touching anything)
 
 1. Read `STATUS.md` fully — it is the live rehydration protocol and phase tracker.
 2. Read `Project_Requirements.md` (the brief: pillars, floors, banned outcomes, phases).
-3. Read `docs/R3F-WEBGPU-NOTES.md` (verified stack facts — do not re-derive from memory).
-4. Skim `docs/DEVIATIONS.md` and the newest entries of `docs/DELTA.md`.
+3. Read `docs/R3F-WEBGPU-NOTES.md` (verified stack facts + 9 hard-won WebGPU/TSL
+   gotchas from this session — do NOT re-derive or re-debug these).
+4. Skim `docs/DEVIATIONS.md` (now D-1..D-4) and the newest `docs/DELTA.md` entry.
 5. **Never re-plan from scratch.** Continue from STATUS.md "Current focus".
 
-### Where we are
+### Goal
 
-- **Phase 0 (scaffold + harness), gate now GREEN.** The verify battery passes 3/3
-  hard checks (eslint 0-warnings, vitest 13 tests, Playwright e2e).
-- The current checked-in app still renders on **React Three Fiber v8 → WebGLRenderer**.
-  There is **no WebGPU code in `client/src` yet** — the WebGPU-only end state in
-  `Project_Requirements.md` describes the *Phase 1 target*, not today's build.
-- All work is on **`main`** (pushed: `b7d1c75`) and branch
-  `docs/sector9-requirements-scaffold` (pushed). Working tree clean.
+Autonomously loop-engineer the brief's phase plan (user instruction: "loop engineer
+these features"). Phases 0–5 gated; a phase closes only after the verify battery,
+reference-delta, and a fresh-context `gate-verifier` agent dispatch.
 
-### What this session did
+### Where we are (verified, all on `main`, tree clean at `9e5b920`)
 
-- Diagnosed a red verify gate. Root cause: commit `51cfad3` had removed the `e2e`
-  npm script + `@playwright/test` dep from `client/package.json`, and the file
-  also carried a stray `cla` prefix (invalid JSON). Restored both; stripped the typo.
-- `vite.config.js`: added `test.exclude` for `e2e/**` so vitest stops trying to run
-  the Playwright spec (its `test.describe` is incompatible with the vitest runner).
-- eslint 52 → 0: removed genuine dead code; added a documented `react/prop-types: off`
-  (plain-JSX, all-internal components); annotated two intentional mount-only effects
-  with justified `exhaustive-deps` disables.
-- Merged `origin/main`'s stray doc commit (`REFACTOR PLAN.md`) back in; pushed `main`.
+- **Phase 0: CLOSED** — gate-verifier verdict PASS (independent battery re-run + per-item
+  evidence). Reference asset corrected: grade visuals against
+  **`reference/sector9_deck_hero.png`** (the lit 3D deck render), NOT
+  `media__new_visuals.png` (a flat menu card the brief mistakenly pointed at).
+- **Phase 1 (~80%): the game now runs WebGPU-only** — React 19.2.7 / fiber 9.6.1 /
+  drei 10.7.7 / rapier 2.2.0 / three 0.185.1, `WebGPURenderer` via async `gl` factory,
+  capability gate + designed unsupported screen (e2e-tested in a real no-adapter
+  browser). TSL procedural deck (~1.35M tris @ 60 fps, seeded via `?seed=N`), CSM
+  lighting rig, post stack (GTAO/bloom/CA/vignette/godrays) on three's own
+  PostProcessing. Pillar-A role gates enforced + unit/e2e tested (`isSolo` bypass is
+  dead). Zero external assets (fonts D-2, lobby PNG deleted). Bundle floor MET:
+  ~483 KB gzip ≤ 500 KB (three source-entry shim + rapier WASM chunk carve-out).
+  Mobile profile (emulated): 60 fps / 1.27M tris.
+- **Battery: PASS** (eslint 0 warnings, vitest 19, Playwright 3/3). Run
+  `node tools/verify.mjs` before claiming ANYTHING is done — STATUS.md line 11 governs.
 
-### The one command that matters
+### What worked (keep doing)
 
-```bash
-node tools/verify.mjs        # from repo root — must print "BATTERY: PASS" (3/3 hard)
-```
+- The build loop: one coherent chunk per iteration → probe empirically in headless
+  Chromium (`--enable-unsafe-webgpu --use-angle=metal`) → battery → STATUS update →
+  commit. Screenshots + measured numbers before every "done" claim.
+- Verifying APIs against installed `node_modules` source before use (caught the async
+  `gl` factory contract, `drawCalls` vs `calls`, CA/GTAO node traps).
+- Fresh-context gate-verifier at phase gates (caught the wrong reference asset).
 
-Run it before claiming ANY work is done. Do not disable a test or lint rule to go
-green (a documented, principled rule-scope like the two in `.eslintrc.cjs` is the
-only exception, and it must be justified in a comment). STATUS.md line 11 is the
-governing discipline: **audit every progress claim against a tool result from the
-current session — a screenshot, a test run, a measured number.**
+### What didn't work (do NOT retry blind — details in docs/R3F-WEBGPU-NOTES.md)
 
-### Manual test
+- React 19 `<StrictMode>` + fiber v9 async WebGPU factory → frame loop freezes, zero
+  errors. StrictMode stays OFF in `main.jsx`.
+- drei `<ContactShadows>` under WebGPU; reading `renderer.info` from `useFrame`;
+  `chromaticAberration` on computed chains / null center; component-wise GTAO multiply
+  (use `.r`); full-res GTAO at dpr 2 (~1 fps — run half-res/8-sample).
+- `scene.environment` from the PMREM probe bake (`render/EnvironmentProbe.jsx`) tanks
+  60→1 fps combined with the PostFX scene pass + cube shadows — built but NOT mounted
+  (D-4). Needs its own debugging round; do not simply re-mount it.
+- Unclamped `lerp(…, k*delta)` camera follow (pipeline-compile delta spikes → permanent
+  oscillation); 3D-tracked drei `<Html>` click targets (screen-fix them when open).
+- After editing `src/render/three-webgpu-shim.js`: `rm -rf client/node_modules/.vite`
+  (the dep optimizer inlines the old shim into cached pre-bundles).
 
-- Client dev server (solo mode, no backend needed): `npm run dev --prefix client`
-  → open the printed `http://localhost:517x/`. Solo-swap the three roles with keys
-  `1` / `2` / `3`. Full multiplayer additionally needs the Node/Socket.io server.
+### Next steps (in order — Phase 1 gate close)
 
-### Next steps (from STATUS.md "Next actions", in order)
-
-1. **Build the WebGPU capability gate + designed "unsupported" screen** — REQUIRED
-   before the Phase 1 renderer swap so non-WebGPU devices never hit a raw crash.
-   Add its Playwright test (forced non-WebGPU context → unsupported screen, zero
-   console exceptions).
-2. Confirm the React Three Fiber v9 + three.js `WebGPURenderer` integration path
-   against installed source; log findings in `docs/R3F-WEBGPU-NOTES.md`. When Phase 1
-   lands, update `client/e2e/puzzle1.spec.js`'s "app boot" test to assert a WebGPU
-   context on the app canvas instead of WebGL.
-3. Then Phase 1 proper (xhigh effort): WebGPU render-layer rebuild + Puzzle 1 re-homed.
-
-### Open flags (noted, not yet acted on)
-
-- `client/src/components/UIOverlays.jsx` imports a PNG asset (`sector_9_deck_*.png`).
-  Potential tension with the zero-external-assets floor — but it's the lobby, not the
-  play route. Decide during the Phase-1/visual pass; log to `docs/DEVIATIONS.md` if kept.
-
----
+1. **Reference-delta round 1**: hero shot (`tools/capture-hero.mjs`) vs
+   `reference/sector9_deck_hero.png` → 10 ranked gaps in `docs/DELTA.md` → fix top 3
+   (include taming the blown hologram bloom) → re-render.
+2. Final 2M-triangle density turn (`DENSITY` constants in `client/src/render/Deck.jsx`)
+   under the full stack, holding 60 fps.
+3. Wire `tools/perf-probe.mjs --mode assert` into the battery (floors enforced from
+   Phase 1 on).
+4. Dispatch the `gate-verifier` agent on Phase 1 (gate text in
+   `Project_Requirements.md` §6); fix findings; check the box in STATUS.md.
+5. Then Phase 2: Puzzle 2 (tri-vector scanners, 3-role, latch/hold arm mechanic) +
+   the 1→2 chain server-side — see the brief §3.14 and the 2026-07-04 amendment in
+   STATUS.md "Current focus".
 
 # Handoff (v0.2) — historical build log (original R3F v8 game)
 
