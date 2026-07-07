@@ -60,10 +60,10 @@ Recorded 2026-07-07 via `node tools/perf-probe.mjs --mode record --profile deskt
 | Metric | Value |
 | --- | --- |
 | fps (median) | 2 |
-| drawCalls (median) | 518 |
-| triangles (median) | 1347447 |
-| samples | 30 |
-| JS+CSS gzip, client/dist, excl. .wasm | 483.2 KB (494752 bytes) |
+| drawCalls (median) | 504 |
+| triangles (median) | 1337959 |
+| samples | 6 |
+| JS+CSS gzip, client/dist, excl. .wasm | 483.2 KB (494828 bytes) |
 
 _Record-only until the Phase 1 gate: not yet compared against the §2 floors (desktop >=60fps/>=2M tris/<=500KB gzip, mobile >=30fps/>=0.5M tris). `perf-probe.mjs --mode assert` enforces those floors at Phase 1 close and onward._
 ## Next actions
@@ -80,7 +80,9 @@ _Record-only until the Phase 1 gate: not yet compared against the §2 floors (de
    - **Triangles: 985 K/frame at 60 fps** (desktop headless, ~417 draws) — up from 158 K via justified detail only: beveled ExtrudeGeometry floor plates (400, real chamfers), 3,200 20-radial rivets, 6,000 greebles, 100 sagging cables (56×12 tubes), doubled pipe drops, reactor core icosa detail 6 + 28×300 torus rings. **2M hero floor still open** — remaining 2× is a DENSITY-constant turn in `Deck.jsx`; do it at the delta/gate round when godrays+probe-GI fix the real fps budget.
    - **Volumetric shafts SHIPPED** (2026-07-07, battery PASS): GodraysNode raymarched from the reactor's now-shadow-casting glow point light (512² cube shadow; light instance shared to the post stack via `render/lightRegistry.js` ref-callback registry; PostFX rebuilt in an effect so the ref exists — renders plainly until built, never a dead frame). 28 steps, additive composite in reactor hue. Measured: **60 fps, ~521 draws, ~1.35M tris/frame** (cube shadow pass counts) — shot `client/e2e/shots/deck-wip.png`: shafts + bounce read clearly; hologram bloom still blown (delta-round tune).
    - **Shadow/GI deviations formalized + mobile measured** (2026-07-07, battery PASS): D-3 (PCSS + SS-contact → PCFSoft CSM + GTAO grounding, Phase-5 payback via the `shadowNode` filter seam) and D-4 (probe-volume GI → fixture lighting + GTAO; **a real PMREM single-probe bake was BUILT and works visually** — `render/EnvironmentProbe.jsx`, bakes the live deck via `PMREMGenerator.fromScene` → `scene.environment` — but drops 60→1 fps combined with the PostFX scene pass + cube shadows, suspected per-frame pipeline churn, so it is NOT mounted; needs its own debugging round) — both in `docs/DEVIATIONS.md`. **Mobile profile measured (emulated 360×780 dpr1.5): 60 fps median, 1.27M tris** — above the ≥30 fps / ≥0.5M floors (real-device verification is Phase 4's gate; this is a desktop-GPU emulation number, recorded as such).
-   - **Remaining for the Phase-1 gate:** reference-delta round 1 vs `reference/sector9_deck_hero.png` (capture hero shot → 10 ranked gaps → fix top 3 → re-render; includes taming the blown hologram bloom), final 2M density turn under the full stack, `perf-probe --mode assert` wiring into the battery, then gate-verifier dispatch on Phase 1.
+   - **Reference-delta round 1 COMPLETE** (2026-07-07, battery PASS after): full entry in `docs/DELTA.md`. 10 gaps ranked vs `reference/sector9_deck_hero.png`; top 3 fixed and verified by re-render (`docs/shots/phase1-hero.png`): hologram/ceiling bloom blowout tamed (threshold 1.0/radius 0.6, task lights 38→14 cd, panel emissive 3.2→1.7, CA 0.35), dedicated hero vantage `?hero=1` (GameCanvas `HeroCamera`, capture-hero defaults to it, `--gameplay` opts out), wall black-crush fixed (wall metalness 0.55 + hemisphere 4.2 + partition glass tinted `#2ec8e6`). Biggest remaining gaps re-ranked in DELTA.md: reactor reads as a plain ball, no ambient haze, floor grime.
+   - **Perf-probe warmup bias found** (2026-07-07): `--mode record` samples immediately after `__SCENE_READY__`, i.e. during WebGPU pipeline compilation — the auto-recorded "fps (median) 2 / 6 samples" in the baseline block above is that artifact, not steady state (debug probes measure 60 fps after warmup; the 6-of-30 sample count shows the page was stalling in compiles). Fix (skip warmup until the fps signal stabilizes) lands with the `--mode assert` wiring, or the fps floor would gate on compile time.
+   - **Remaining for the Phase-1 gate:** final 2M density turn under the full stack, `perf-probe --mode assert` wiring into the battery (incl. the warmup fix), then gate-verifier dispatch on Phase 1.
 
 ## Gotchas (append-only; newest first)
 

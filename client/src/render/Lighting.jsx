@@ -21,11 +21,11 @@ import { sceneLights } from './lightRegistry'
 const FIXTURES = {
   // Ceiling light panels: [x, z, tint, intensity(candela)]
   panels: [
-    [-5, -5, '#bcd2ff', 26],
-    [5, -5, '#bcd2ff', 26],
-    [-5, 5, '#bcd2ff', 26],
-    [5, 5, '#bcd2ff', 26],
-    [0, 0, '#d6e4ff', 30],
+    [-5, -5, '#bcd2ff', 18],
+    [5, -5, '#bcd2ff', 18],
+    [-5, 5, '#bcd2ff', 18],
+    [5, 5, '#bcd2ff', 18],
+    [0, 0, '#d6e4ff', 20],
   ],
   // Sector bounce fills (shadowless, mimic wall-neon bounce until probes):
   fills: [
@@ -70,7 +70,9 @@ const CSMKeyLight = ({ isMobile }) => {
 
 export const Lighting = ({ isMobile = false }) => {
   const panelMat = useMemo(
-    () => neonMaterial({ tint: '#cfe0ff', intensity: 3.2, flicker: 0.02 }),
+    // 1.7: just over the bloom threshold for a tight halo — 3.2 blew the
+    // ceiling into a frame-wide white haze (delta round 1, gap #1 family).
+    () => neonMaterial({ tint: '#cfe0ff', intensity: 1.7, flicker: 0.02 }),
     []
   )
   const panelGeo = useMemo(() => new THREE.BoxGeometry(1.8, 0.06, 0.9), [])
@@ -85,8 +87,8 @@ export const Lighting = ({ isMobile = false }) => {
     <>
       {/* Skylight fill: shadowed metal reads cool, never black (Pillar C).
           Intensities are physical units (candela for point/spot, decay 2). */}
-      <hemisphereLight args={['#46587e', '#141826', 3.2]} />
-      <ambientLight intensity={0.55} color="#22525e" />
+      <hemisphereLight args={['#46587e', '#141826', 4.2]} />
+      <ambientLight intensity={0.7} color="#22525e" />
 
       {/* Key light: 4-cascade CSM (desktop) / 2-cascade (mobile) */}
       <CSMKeyLight isMobile={isMobile} />
@@ -147,18 +149,20 @@ export const Lighting = ({ isMobile = false }) => {
         shadow-bias={-0.0015}
       />
 
-      {/* Console task lights (Engineer cyan / Technician magenta) */}
+      {/* Console task lights (Engineer cyan / Technician magenta). 14 cd:
+          enough to pool role color on the plating without the floor hotspot
+          crossing the bloom threshold (delta round 1, gap #1 blowout). */}
       <pointLight
-        position={[-5, 1.6, 0]}
-        intensity={38}
+        position={[-5, 2.0, 0]}
+        intensity={14}
         distance={6}
         decay={2}
         color="#00f3ff"
         castShadow={!isMobile}
       />
       <pointLight
-        position={[5, 1.6, 0]}
-        intensity={38}
+        position={[5, 2.0, 0]}
+        intensity={14}
         distance={6}
         decay={2}
         color="#ff007f"

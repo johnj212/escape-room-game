@@ -13,7 +13,10 @@
 // a fixed number of rendered frames (deterministic — not a wall-clock race), then screenshots
 // the <canvas> element to docs/shots/phase<N>-hero.png.
 //
-// CLI: node tools/capture-hero.mjs [--phase <N>] [--out <path>]
+// CLI: node tools/capture-hero.mjs [--phase <N>] [--out <path>] [--gameplay]
+// Default framing is the fixed hero vantage (`?hero=1`, GameCanvas.jsx HeroCamera) that
+// matches reference/sector9_deck_hero.png's composition; --gameplay keeps the old
+// follow-camera framing for gameplay-context shots.
 // Self-contained: starts (and tears down) the Vite dev server itself if one isn't already
 // running on BASE_URL, so `node tools/capture-hero.mjs` works with nothing else running.
 
@@ -41,11 +44,12 @@ const DESKTOP_PROFILE = { width: 1440, height: 810, deviceScaleFactor: 2 }
 const SETTLE_FRAMES = 90
 
 function parseArgs(argv) {
-  const args = { phase: 0, out: null }
+  const args = { phase: 0, out: null, gameplay: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--phase') args.phase = Number(argv[++i])
     else if (a === '--out') args.out = argv[++i]
+    else if (a === '--gameplay') args.gameplay = true
   }
   return args
 }
@@ -95,8 +99,9 @@ function stopDevServer(child) {
   }
 }
 
-async function driveToPlayingState(page) {
-  await page.goto(BASE_URL + '/')
+async function driveToPlayingState(page, { hero = true } = {}) {
+  // ?seed pins the procedural layout; ?hero=1 selects the fixed hero vantage.
+  await page.goto(BASE_URL + '/?seed=9' + (hero ? '&hero=1' : ''))
   const launchButton = page.getByRole('button', { name: /Launch Offline Reactor/i })
   await launchButton.waitFor({ state: 'visible', timeout: 15_000 })
   await launchButton.click()
@@ -151,7 +156,7 @@ async function main() {
     })
     const page = await context.newPage()
 
-    await driveToPlayingState(page)
+    await driveToPlayingState(page, { hero: !args.gameplay })
     await freezeCheapNondeterminism(page)
     await settleFrames(page, SETTLE_FRAMES)
 

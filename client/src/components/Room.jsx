@@ -8,7 +8,13 @@ import { containmentGlassMaterial, neonMaterial } from '../render/materials'
 // here are collision-only: their meshes are invisible so the deck geometry
 // is the single visual source of truth.
 export const Room = () => {
-  const glassMat = useMemo(() => containmentGlassMaterial(), [])
+  // Deeper cyan + matte-er than the reactor glass: edge-on in the hero
+  // framing the partition is the frame's central beam — it should read as
+  // sector-cyan energy, not a blown-white specular runway (delta round 1).
+  const glassMat = useMemo(
+    () => containmentGlassMaterial({ tint: '#2ec8e6', opacity: 0.22 }),
+    []
+  )
   const postMat = useMemo(() => neonMaterial({ tint: '#00f3ff', intensity: 2.2 }), [])
 
   useLayoutEffect(() => {

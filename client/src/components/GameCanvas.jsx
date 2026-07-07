@@ -52,6 +52,29 @@ const PerfProbe = () => {
   return null
 }
 
+// Hero vantage (`?hero=1`): a fixed cinematic camera framing the deck the
+// way reference/sector9_deck_hero.png does — reactor centered on the back
+// wall, consoles flanking, ceiling trusses in the top third. Used by
+// tools/capture-hero.mjs for the reference-delta loop so the shot judges the
+// deck, not the patch of floor under the gameplay follow-camera. Set every
+// frame (cheap) so nothing else can drift it between settle frames.
+const HERO_CAMERA = {
+  // On the partition line (x=0): the sector glass reads edge-on as a thin
+  // energy divider down the frame center — same role as the reference's
+  // floor-crossing beam — with the reactor dead center and a console per side.
+  position: new THREE.Vector3(0, 4.6, 8.7),
+  lookAt: new THREE.Vector3(0, 2.9, -9),
+}
+
+const HeroCamera = () => {
+  const { camera } = useThree()
+  useFrame(() => {
+    camera.position.copy(HERO_CAMERA.position)
+    camera.lookAt(HERO_CAMERA.lookAt)
+  })
+  return null
+}
+
 // Custom Camera Controller to smoothly track the active player
 const CameraFollow = () => {
   const { camera } = useThree()
@@ -97,6 +120,9 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
 
   // Detect mobile
   const isMobile = /Mobi|Android/i.test(navigator.userAgent)
+
+  // Reference-delta hero framing (capture tooling only; no gameplay effect).
+  const isHeroView = new URLSearchParams(window.location.search).has('hero')
 
   return (
     <Canvas
@@ -152,7 +178,7 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
         ))}
       </Physics>
 
-      <CameraFollow />
+      {isHeroView ? <HeroCamera /> : <CameraFollow />}
       <PerfProbe />
 
       {/* Post stack (render/PostFX.jsx): GTAO + bloom + CA + vignette on

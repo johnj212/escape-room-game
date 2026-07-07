@@ -59,7 +59,9 @@ export const PostFX = ({ isMobile = false }) => {
       const normal = scenePass.getTextureNode('normal')
       const depth = scenePass.getTextureNode('depth')
 
-      const aberrated = chromaticAberration(colorTex, 0.55, vec2(0.5, 0.5), 1.04)
+      // 0.35: fringing should whisper at frame edges, not rainbow-split the
+      // ceiling neon (delta round 1 re-render check).
+      const aberrated = chromaticAberration(colorTex, 0.35, vec2(0.5, 0.5), 1.04)
 
       const aoPass = ao(depth, normal, camera)
       aoPass.resolutionScale = 0.5
@@ -79,7 +81,11 @@ export const PostFX = ({ isMobile = false }) => {
       }
     }
 
-    const bloomPass = bloom(beauty, isMobile ? 0.5 : 0.7, 0.85, 0.72)
+    // Threshold 1.0: only true HDR emitters (neon, reactor, holograms) bloom —
+    // lit metal and light-pool hotspots on the floor stay crisp. Radius 0.6
+    // keeps halos hugging their sources (delta round 1, gap #1: the old
+    // 0.72/0.85 smeared the hologram console into a frame-eating blob).
+    const bloomPass = bloom(beauty, isMobile ? 0.5 : 0.6, 0.6, 1.0)
     let composed = beauty.add(bloomPass)
 
     const radial = screenUV.sub(0.5).mul(2.0).length()

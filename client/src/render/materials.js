@@ -97,7 +97,11 @@ export function wallPanelMaterial({ panelWidth = 2 } = {}) {
     .add(vec3(brushing.mul(0.015)))
     .sub(vec3(smoothstep(0.45, 0.8, blotch).mul(0.03)))
   mat.roughnessNode = float(0.5).add(blotch.mul(0.2)).clamp(0.3, 0.8)
-  mat.metalnessNode = float(0.75)
+  // 0.55, not 0.75: pure metal has no diffuse lobe, and with the environment
+  // probe benched (D-4) there is nothing to reflect — walls away from the
+  // sector washes crushed to black (Pillar C, delta round 1 gap #3). A
+  // painted-alloy read keeps enough diffuse for the hemisphere fill to carry.
+  mat.metalnessNode = float(0.55)
   return mat
 }
 
