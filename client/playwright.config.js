@@ -39,11 +39,24 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      // Everything except the capability-gate spec runs WITH WebGPU available.
+      testIgnore: /capability\.spec\.js/,
       use: {
         ...devices['Desktop Chrome'],
         launchOptions: {
           args: WEBGPU_ARGS,
         },
+      },
+    },
+    {
+      // Forced non-WebGPU context (verification battery #6): headless
+      // Chromium with NO WebGPU flags exposes `navigator.gpu` but resolves
+      // `requestAdapter()` to null (verified — docs/R3F-WEBGPU-NOTES.md).
+      // A real no-adapter environment for the unsupported-screen route.
+      name: 'chromium-no-webgpu',
+      testMatch: /capability\.spec\.js/,
+      use: {
+        ...devices['Desktop Chrome'],
       },
     },
   ],

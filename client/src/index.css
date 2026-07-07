@@ -646,3 +646,96 @@ canvas {
     margin-bottom: 10px;
   }
 }
+
+/* Capability gate — designed unsupported screen */
+.unsupported-beacon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 20px;
+  border: 1px solid var(--neon-red);
+  border-radius: 50%;
+  box-shadow: 0 0 25px var(--neon-red-glow), inset 0 0 15px var(--neon-red-glow);
+  animation: unsupported-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes unsupported-pulse {
+  0%, 100% { box-shadow: 0 0 25px var(--neon-red-glow), inset 0 0 15px var(--neon-red-glow); }
+  50% { box-shadow: 0 0 45px var(--neon-red-glow), inset 0 0 25px var(--neon-red-glow); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .unsupported-beacon {
+    animation: none;
+  }
+}
+
+.unsupported-panel {
+  width: min(480px, calc(100vw - 40px));
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  text-align: left;
+}
+
+.unsupported-diag {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: rgba(255, 49, 49, 0.06);
+  border: 1px solid var(--neon-red-glow);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.unsupported-diag-code {
+  font-family: var(--font-hud);
+  font-size: 0.75rem;
+  letter-spacing: 2px;
+  color: var(--neon-red);
+}
+
+.unsupported-diag-detail {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+.unsupported-reqs-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-hud);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--neon-cyan);
+  margin-bottom: 8px;
+}
+
+.unsupported-reqs ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.unsupported-reqs li::before {
+  content: '»';
+  color: var(--neon-cyan);
+  margin-right: 8px;
+}
+
+.unsupported-hint {
+  margin-top: 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}

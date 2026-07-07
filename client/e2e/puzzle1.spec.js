@@ -6,21 +6,23 @@ import { test, expect } from '@playwright/test'
 // end-state for this game is a WebGPU-only renderer with no WebGL fallback. That
 // renderer rewrite is Phase 1 and has NOT happened yet — as of this suite, the app
 // (client/src/components/GameCanvas.jsx) still boots a stock React Three Fiber v8
-// <Canvas>, which creates a WebGLRenderer. There is no capability gate / designed
-// "unsupported" screen yet either (that is also explicitly listed as Phase 0
-// remainder work in STATUS.md).
+// <Canvas>, which creates a WebGLRenderer. The WebGPU CAPABILITY GATE, however,
+// IS live (client/src/render/capability.js): the app routes through it before
+// anything renders, so a WebGPU-capable device currently gets the WebGL game
+// and a non-WebGPU device gets the designed unsupported screen (tested in
+// e2e/capability.spec.js under the flag-less `chromium-no-webgpu` project).
 //
 // So this suite does two separate things and does not conflate them:
 //   1. Proves the *harness* can get a real WebGPU adapter in the Playwright-
 //      controlled browser (playwright.config.js launch flags), so Phase 1 can
 //      build on this immediately without re-deriving the flag investigation.
-//   2. Exercises the *actual current app* (WebGL) end-to-end: boot, canvas/GL
-//      context live, zero console errors, and a full solo-swap solve of Puzzle 1.
+//   2. Exercises the *actual current app* (WebGL) end-to-end: gate routes
+//      'supported', boot, canvas/GL context live, zero console errors, and a
+//      full solo-swap solve of Puzzle 1.
 //
 // When Phase 1 lands the WebGPURenderer, the "app boot" test's WebGL-context
-// assertion must be swapped for a WebGPU-adapter-on-the-app-canvas assertion,
-// and a capability-gate test (forced non-WebGPU -> unsupported screen, zero
-// console exceptions) must be added. Tracked in STATUS.md, not here.
+// assertion must be swapped for a WebGPU-adapter-on-the-app-canvas assertion.
+// Tracked in STATUS.md, not here.
 
 test.describe('WebGPU harness capability (forward-looking, Phase 1 prep)', () => {
   test('Playwright-controlled Chromium acquires a real, non-null WebGPU adapter', async ({ page }) => {
@@ -59,8 +61,15 @@ test.describe('App boot + solo-swap solve of Puzzle 1 (Decoupled Power Grid)', (
 
     await page.goto('/')
 
-    // 1. Lobby renders (no "unsupported" screen, no crash).
+    // 1. Lobby renders (no "unsupported" screen, no crash). The lobby only
+    // mounts after the WebGPU capability gate routes 'supported', so this
+    // also proves the supported path — assert the gate's exposed decision
+    // and the §2 routing floor (< 500 ms).
     await expect(page.getByText('Sector-9 Command Deck')).toBeVisible()
+    const capability = await page.evaluate(() => window.__CAPABILITY__)
+    expect(capability.supported).toBe(true)
+    expect(capability.reason).toBe('ok')
+    expect(capability.durationMs).toBeLessThan(500)
     // Solo mode is the default game-store state; assert the offline launch
     // affordance STATUS.md's "solo-swap solve of Puzzle 1" flow depends on.
     const launchButton = page.getByRole('button', { name: /Launch Offline Reactor/i })

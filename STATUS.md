@@ -45,11 +45,15 @@ Phase 0 in progress. Operating files scaffolded (this file, `docs/DELTA.md`, `do
 
 **Playwright e2e harness stood up and green** (2026-07-04): `client/playwright.config.js`, `client/e2e/puzzle1.spec.js`, `npm run e2e` in `client/`. Verified WebGPU adapter acquisition in Playwright-controlled Chromium (flags + findings in `docs/R3F-WEBGPU-NOTES.md`) and a full solo-swap solve of Puzzle 1 against the *current* (pre-Phase-1) build. Confirmed while building this: **the checked-in app still renders on R3F v8 → `WebGLRenderer`** — `client/src` has no WebGPU code yet, so the WebGPU-only end-state in `Project_Requirements.md` does not describe the current build, only the Phase 1 target. The e2e suite's "app boot" test therefore asserts a live WebGL context today; it must be swapped to assert a WebGPU context on the app's own canvas once Phase 1 lands.
 
-**Not yet built (Phase 0 remainder):** in-scene perf HUD (fps/draw-calls/triangles), the WebGPU capability gate + unsupported screen, a measured fps/bundle-size baseline on the current WebGL build, and confirmation of the R3F v9 + `WebGPURenderer` integration path.
+**WebGPU capability gate + designed unsupported screen SHIPPED and verified** (2026-07-07): `client/src/render/capability.js` (async adapter probe, stable reason codes, result mirrored to `window.__CAPABILITY__`), `client/src/components/UnsupportedScreen.jsx` (designed screen — screenshot evidence at `client/e2e/shots/unsupported-screen.png`), gated in `App.jsx` before anything renders. e2e: new `chromium-no-webgpu` Playwright project (no WebGPU flags → real null-adapter context, per the verified R3F-WEBGPU-NOTES finding) runs `client/e2e/capability.spec.js` — unsupported screen visible, zero console errors/pageerrors, zero canvases mounted, routed in <500 ms; supported path asserted in `puzzle1.spec.js` (`reason === 'ok'`, `durationMs < 500`). All 3 e2e green + full battery PASS this session. The §3.1 *recorded-demo hook* on the unsupported screen is deliberately deferred until WebGPU hero footage exists to record (Phase 1+) — no dead button shipped.
+
+**Open flag (found 2026-07-07):** `client/src/index.css:1` `@import`s Google Fonts (Inter + Orbitron) at runtime — an external asset in the play route (Pillar B tension), alongside the known lobby PNG flag in `handoff.md` §0. Both must be resolved in Phase 1's asset-free pass (procedural/system-font substitute or a `docs/DEVIATIONS.md` entry).
+
+**Not yet built (Phase 0 remainder):** in-scene perf HUD (fps/draw-calls/triangles — `window.__PERF__` publishing exists for the probe; a visible HUD does not), and confirmation of the R3F v9 + `WebGPURenderer` integration path.
 
 ## Phase-0 baseline (WebGL)
 
-Recorded 2026-07-04 via `node tools/perf-probe.mjs --mode record --profile desktop` (pre-Phase-1 R3F v8 WebGLRenderer build, 1440x810 dpr2).
+Recorded 2026-07-07 via `node tools/perf-probe.mjs --mode record --profile desktop` (pre-Phase-1 R3F v8 WebGLRenderer build, 1440x810 dpr2).
 
 | Metric | Value |
 | --- | --- |
@@ -57,15 +61,17 @@ Recorded 2026-07-04 via `node tools/perf-probe.mjs --mode record --profile deskt
 | drawCalls (median) | 1 |
 | triangles (median) | 2 |
 | samples | 29 |
-| JS+CSS gzip, client/dist, excl. .wasm | 1081.5 KB (1107457 bytes) |
+| JS+CSS gzip, client/dist, excl. .wasm | 1083.1 KB (1109088 bytes) |
 
 _Phase 0 records the current WebGL numbers only — not compared against the WebGPU floors in `Project_Requirements.md` §2 (desktop >=60fps/>=2M tris/<=500KB gzip, mobile >=30fps/>=0.5M tris). `perf-probe.mjs --mode assert` enforces those floors from Phase 1 onward._
 ## Next actions
 
-1. Establish the current WebGL build's baseline (fps, bundle size) so Phase 1's WebGPU rebuild has a before/after to compare — record numbers here, not from memory.
+1. ~~Establish the current WebGL build's baseline (fps, bundle size)~~ — done, see "Phase-0 baseline (WebGL)" table above (auto-refreshed by each verify run).
 2. ~~Stand up Playwright and write the first e2e: solo-swap solve of Puzzle 1~~ — done 2026-07-04, see above.
-3. Build the capability-gate + designed unsupported screen (needed before the Phase 1 renderer swap so non-WebGPU devices never hit a raw crash). Add its Playwright test (forced non-WebGPU context → unsupported screen, zero console exceptions) alongside it.
-4. Confirm React Three Fiber v9 + three.js `WebGPURenderer` integration path against installed source; log findings in `docs/R3F-WEBGPU-NOTES.md`. When this lands, update `client/e2e/puzzle1.spec.js`'s "app boot" test to assert a WebGPU context on the app canvas instead of WebGL.
+3. ~~Build the capability-gate + designed unsupported screen + its Playwright test~~ — done 2026-07-07, see above.
+4. Confirm React Three Fiber v9 + three.js `WebGPURenderer` integration path against installed source (requires installing the v9/latest-three dep set — do this on a branch or with the verify battery run before/after); log findings in `docs/R3F-WEBGPU-NOTES.md`. When Phase 1 lands, update `client/e2e/puzzle1.spec.js`'s "app boot" test to assert a WebGPU context on the app canvas instead of WebGL.
+5. Build the in-scene perf HUD (fps/draw-calls/triangles, toggleable) — last Phase 0 deliverable.
+6. Dispatch the `gate-verifier` agent on Phase 0; fix anything it surfaces; close the Phase 0 gate in the checklist above. Then Phase 1 (xhigh): WebGPU render-layer rebuild + Puzzle 1 re-homed (incl. removing the `isSolo` role bypass at `WirePuzzle.jsx:47`, killing the Google-Fonts/lobby-PNG external assets or logging deviations).
 
 ## Gotchas (append-only; newest first)
 
