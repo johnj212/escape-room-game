@@ -3,6 +3,7 @@ import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { CSMShadowNode } from 'three/examples/jsm/csm/CSMShadowNode.js'
 import { neonMaterial } from './materials'
+import { sceneLights } from './lightRegistry'
 
 // Sector-9 lighting rig (§3.4, Pillars C + F).
 //
@@ -128,7 +129,23 @@ export const Lighting = ({ isMobile = false }) => {
         castShadow={!isMobile}
         shadow-bias={-0.0002}
       />
-      <pointLight position={[0, 3.9, -8.8]} color="#ff6a2a" intensity={55} distance={15} decay={2} />
+      <pointLight
+        // Shadow-casting so GodraysNode can raymarch its shafts (the effect
+        // requires the driving light to cast shadows). 512² cube faces are
+        // plenty for soft volumetric occlusion.
+        ref={(light) => {
+          sceneLights.reactor = light ?? undefined
+        }}
+        position={[0, 3.9, -8.8]}
+        color="#ff6a2a"
+        intensity={55}
+        distance={15}
+        decay={2}
+        castShadow={!isMobile}
+        shadow-mapSize-width={512}
+        shadow-mapSize-height={512}
+        shadow-bias={-0.0015}
+      />
 
       {/* Console task lights (Engineer cyan / Technician magenta) */}
       <pointLight

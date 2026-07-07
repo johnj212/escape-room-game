@@ -1,6 +1,6 @@
 {
   "phase": 0,
-  "timestamp": "2026-07-07T13:52:38.738Z",
+  "timestamp": "2026-07-07T13:58:18.696Z",
   "overallPass": true,
   "hardTotal": 3,
   "hardPassed": 3,
@@ -11,7 +11,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 844,
+      "durationMs": 897,
       "note": "0 warnings/errors"
     },
     {
@@ -20,7 +20,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 912,
+      "durationMs": 947,
       "note": "all specs passed"
     },
     {
@@ -29,7 +29,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 6233,
+      "durationMs": 7365,
       "note": "e2e suite green"
     },
     {
@@ -38,8 +38,8 @@
       "hard": false,
       "pass": true,
       "status": "RECORD",
-      "durationMs": 8131,
-      "note": "[dev-server] reusing existing server at http://localhost:5173\n[perf-probe] sampling __PERF__ for 3000ms (desktop)...\n[perf-probe] building client (`npm run build --prefix client`)...\n\nperf-probe results (WebGPU build, Phase 1)\n---------------------------------------------\nprofile                   : desktop\nfps (median)              : 36\ndrawCalls (median)        : 444\ntriangles (median)        : 1020626\nsamples                   : 29\nJS+CSS gzip (excl. .wasm) : 481.6 KB\nJS+CSS files measured     : 2\n.wasm files excluded      : 1\n---------------------------------------------\n[perf-probe] STATUS.md updated (overwrote existing block): /Users/johnmather/coding/Anti/escape room game/STATUS.md\n"
+      "durationMs": 8512,
+      "note": "[dev-server] reusing existing server at http://localhost:5173\n[perf-probe] sampling __PERF__ for 3000ms (desktop)...\n[perf-probe] building client (`npm run build --prefix client`)...\n\nperf-probe results (WebGPU build, Phase 1)\n---------------------------------------------\nprofile                   : desktop\nfps (median)              : 31\ndrawCalls (median)        : 520\ntriangles (median)        : 1344059\nsamples                   : 29\nJS+CSS gzip (excl. .wasm) : 483.2 KB\nJS+CSS files measured     : 2\n.wasm files excluded      : 1\n---------------------------------------------\n[perf-probe] STATUS.md updated (overwrote existing block): /Users/johnmather/coding/Anti/escape room game/STATUS.md\n"
     },
     {
       "id": 5,
