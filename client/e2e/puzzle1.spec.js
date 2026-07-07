@@ -105,6 +105,21 @@ test.describe('App boot + solo-swap solve of Puzzle 1 (Decoupled Power Grid)', (
       .poll(() => page.evaluate(() => window.useGameStore.getState().gamePhase))
       .toBe('playing')
 
+    // 2b. Performance HUD (§5.5): F3 toggles it on, and it reports live
+    // render stats from the same window.__PERF__ feed the perf harness
+    // samples — proving the visible layer, not just the data layer.
+    await page.keyboard.press('F3')
+    await expect(page.getByTestId('perf-hud')).toBeVisible()
+    await expect
+      .poll(async () => {
+        const text = await page.getByTestId('perf-hud').textContent()
+        const fps = Number(/FPS(\d+)/.exec(text.replace(/\s/g, ''))?.[1])
+        return Number.isFinite(fps) && fps > 0
+      })
+      .toBe(true)
+    await page.keyboard.press('F3')
+    await expect(page.getByTestId('perf-hud')).toHaveCount(0)
+
     // 3. Read the cipher the Engineer's hologram displays (Puzzle 1's
     // "information" half) directly from authoritative client state - this is a
     // read-only assertion of what the hologram shows, not a solve shortcut.

@@ -647,6 +647,41 @@ canvas {
   }
 }
 
+/* Performance HUD (F3 / ?hud=1) */
+.perf-hud {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 2000;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: rgba(5, 6, 10, 0.75);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  font-family: var(--font-hud);
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+}
+
+.perf-hud-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 110px;
+}
+
+.perf-hud-row span:last-child {
+  color: var(--neon-cyan);
+}
+
+.perf-hud-fps.ok { color: var(--neon-green) !important; }
+.perf-hud-fps.warn { color: var(--neon-yellow) !important; }
+.perf-hud-fps.bad { color: var(--neon-red) !important; }
+
 /* Capability gate — designed unsupported screen */
 .unsupported-beacon {
   display: flex;

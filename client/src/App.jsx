@@ -6,6 +6,7 @@ import { GameCanvas } from './components/GameCanvas'
 import { UIOverlays } from './components/UIOverlays'
 import { LoadingScreen } from './components/LoadingScreen'
 import { UnsupportedScreen } from './components/UnsupportedScreen'
+import { PerfHud } from './components/PerfHud'
 import { detectWebGPUSupport } from './render/capability'
 
 export default function App() {
@@ -75,6 +76,9 @@ export default function App() {
         emitReady={emitReady}
         emitResetGame={emitResetGame}
       />
+
+      {/* §5.5 performance HUD (F3 / ?hud=1) — sits above every overlay */}
+      <PerfHud />
     </div>
   )
 }

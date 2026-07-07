@@ -49,7 +49,7 @@ Phase 0 in progress. Operating files scaffolded (this file, `docs/DELTA.md`, `do
 
 **Open flag (found 2026-07-07):** `client/src/index.css:1` `@import`s Google Fonts (Inter + Orbitron) at runtime — an external asset in the play route (Pillar B tension), alongside the known lobby PNG flag in `handoff.md` §0. Both must be resolved in Phase 1's asset-free pass (procedural/system-font substitute or a `docs/DEVIATIONS.md` entry).
 
-**Not yet built (Phase 0 remainder):** in-scene perf HUD (fps/draw-calls/triangles — `window.__PERF__` publishing exists for the probe; a visible HUD does not), and confirmation of the R3F v9 + `WebGPURenderer` integration path.
+**Perf HUD SHIPPED + R3F v9 path CONFIRMED** (2026-07-07): `client/src/components/PerfHud.jsx` — visible layer over the existing `window.__PERF__` feed (F3 toggle / `?hud=1`, fps color-coded against the 30/60 floors); e2e-verified in `puzzle1.spec.js` (toggles on, reports live fps > 0, toggles off) — battery PASS. R3F v9 + `WebGPURenderer` integration path verified against installed source in a scratch install (fiber 9.6.1 / three 0.185.1): async `gl` factory awaited by fiber, factory must call `await renderer.init()`, **React 19 required**, full Phase-1 dep matrix + the finding that `@react-three/postprocessing` should be dropped for three's own `PostProcessing` + TSL display nodes — all in `docs/R3F-WEBGPU-NOTES.md` (2026-07-07 entry). **All Phase 0 deliverables now built; gate-verifier dispatch is the only step left before closing Phase 0.**
 
 ## Phase-0 baseline (WebGL)
 
@@ -61,7 +61,7 @@ Recorded 2026-07-07 via `node tools/perf-probe.mjs --mode record --profile deskt
 | drawCalls (median) | 1 |
 | triangles (median) | 2 |
 | samples | 29 |
-| JS+CSS gzip, client/dist, excl. .wasm | 1083.1 KB (1109088 bytes) |
+| JS+CSS gzip, client/dist, excl. .wasm | 1083.5 KB (1109500 bytes) |
 
 _Phase 0 records the current WebGL numbers only — not compared against the WebGPU floors in `Project_Requirements.md` §2 (desktop >=60fps/>=2M tris/<=500KB gzip, mobile >=30fps/>=0.5M tris). `perf-probe.mjs --mode assert` enforces those floors from Phase 1 onward._
 ## Next actions
@@ -69,8 +69,8 @@ _Phase 0 records the current WebGL numbers only — not compared against the Web
 1. ~~Establish the current WebGL build's baseline (fps, bundle size)~~ — done, see "Phase-0 baseline (WebGL)" table above (auto-refreshed by each verify run).
 2. ~~Stand up Playwright and write the first e2e: solo-swap solve of Puzzle 1~~ — done 2026-07-04, see above.
 3. ~~Build the capability-gate + designed unsupported screen + its Playwright test~~ — done 2026-07-07, see above.
-4. Confirm React Three Fiber v9 + three.js `WebGPURenderer` integration path against installed source (requires installing the v9/latest-three dep set — do this on a branch or with the verify battery run before/after); log findings in `docs/R3F-WEBGPU-NOTES.md`. When Phase 1 lands, update `client/e2e/puzzle1.spec.js`'s "app boot" test to assert a WebGPU context on the app canvas instead of WebGL.
-5. Build the in-scene perf HUD (fps/draw-calls/triangles, toggleable) — last Phase 0 deliverable.
+4. ~~Confirm React Three Fiber v9 + three.js `WebGPURenderer` integration path against installed source~~ — done 2026-07-07 via scratch install, findings in `docs/R3F-WEBGPU-NOTES.md`. (Still open for Phase 1 itself: swap `puzzle1.spec.js`'s app-boot WebGL assertion to WebGPU when the renderer lands.)
+5. ~~Build the in-scene perf HUD~~ — done 2026-07-07, see above.
 6. Dispatch the `gate-verifier` agent on Phase 0; fix anything it surfaces; close the Phase 0 gate in the checklist above. Then Phase 1 (xhigh): WebGPU render-layer rebuild + Puzzle 1 re-homed (incl. removing the `isSolo` role bypass at `WirePuzzle.jsx:47`, killing the Google-Fonts/lobby-PNG external assets or logging deviations).
 
 ## Gotchas (append-only; newest first)
