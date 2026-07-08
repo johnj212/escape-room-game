@@ -113,13 +113,16 @@ export function wallPanelMaterial({ panelWidth = 2 } = {}) {
 
 // -- trim / structural metal ---------------------------------------------------
 
-/** Darker structural alloy for beams, pipes, cages, greebles. */
+/** Darker structural alloy for beams, pipes, cages, greebles.
+ *  Metalness 0.7 (not 0.9): with the environment probe benched (D-4) a
+ *  near-pure metal has almost no diffuse lobe and crushes to black away
+ *  from direct light — Pillar C (gate-verifier flag, 2026-07-08). */
 export function structuralMetalMaterial({ tone = '#12161f' } = {}) {
   const mat = new MeshStandardNodeMaterial()
   const grain = mx_noise_float(positionWorld.xyz.mul(6.0))
   mat.colorNode = color(tone).add(vec3(grain.mul(0.012)))
   mat.roughnessNode = float(0.55).add(grain.mul(0.15))
-  mat.metalnessNode = float(0.9)
+  mat.metalnessNode = float(0.7)
   return mat
 }
 

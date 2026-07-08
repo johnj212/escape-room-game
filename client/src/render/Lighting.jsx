@@ -35,8 +35,8 @@ const FIXTURES = {
   // Pulled toward the consoles (±7) since the dedicated console task lights
   // were consolidated away — one light per sector does both jobs now.
   fills: [
-    [-7, 3.2, 0, '#00f3ff', 11, 10], // Engineer wall + console wash
-    [7, 3.2, 0, '#ff007f', 11, 10], // Technician wall + console wash
+    [-7, 4.5, 0, '#00f3ff', 16, 12], // Engineer wall + console wash
+    [7, 4.5, 0, '#ff007f', 16, 12], // Technician wall + console wash
   ],
 }
 
@@ -93,8 +93,11 @@ export const Lighting = ({ isMobile = false }) => {
     <>
       {/* Skylight fill: shadowed metal reads cool, never black (Pillar C).
           Intensities are physical units (candela for point/spot, decay 2). */}
-      <hemisphereLight args={['#46587e', '#141826', 4.2]} />
-      <ambientLight intensity={0.7} color="#22525e" />
+      {/* Raised 2026-07-08 after the Phase-1 gate-verifier pixel-measured
+          37–77% near-black side-wall area post-D-5 (Pillar C flag). Same
+          light count — intensity-only, zero per-pixel cost. */}
+      <hemisphereLight args={['#46587e', '#1a2030', 6.0]} />
+      <ambientLight intensity={2.0} color="#2e5560" />
 
       {/* Key light: 4-cascade CSM (desktop) / 2-cascade (mobile) */}
       <CSMKeyLight isMobile={isMobile} />

@@ -1,6 +1,6 @@
 {
   "phase": 1,
-  "timestamp": "2026-07-08T06:18:27.574Z",
+  "timestamp": "2026-07-08T10:33:32.118Z",
   "overallPass": true,
   "hardTotal": 5,
   "hardPassed": 5,
@@ -11,7 +11,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 1177,
+      "durationMs": 899,
       "note": "0 warnings/errors"
     },
     {
@@ -20,7 +20,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 1202,
+      "durationMs": 1010,
       "note": "all specs passed"
     },
     {
@@ -29,7 +29,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 7339,
+      "durationMs": 7578,
       "note": "e2e suite green"
     },
     {
@@ -38,7 +38,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 68137,
+      "durationMs": 65289,
       "note": "§2 desktop floors met"
     },
     {
@@ -47,7 +47,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 67861,
+      "durationMs": 65205,
       "note": "§2 mobile floors met"
     }
   ]

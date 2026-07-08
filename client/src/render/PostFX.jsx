@@ -119,8 +119,11 @@ export const PostFX = ({ isMobile = false }) => {
       composed = beauty.add(bloomPass)
     }
 
+    // Floor 0.8 (was 0.65): the Phase-1 gate-verifier pixel-measured the old
+    // vignette crushing already-dim wall corners below the Pillar-C bar —
+    // the frame edges must darken, never black out.
     const radial = screenUV.sub(0.5).mul(2.0).length()
-    const vignette = smoothstep(1.65, 0.55, radial).mul(0.35).add(0.65)
+    const vignette = smoothstep(1.75, 0.5, radial).mul(0.2).add(0.8)
     composed = composed.mul(vec3(float(vignette)))
 
     if (isMobile) {

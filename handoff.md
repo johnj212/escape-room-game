@@ -7,79 +7,84 @@
 
 ---
 
-## 0. Current session handoff (2026-07-07) — READ FIRST
+## 0. Current session handoff (2026-07-08) — READ FIRST
 
 ### Rehydration (do this before touching anything)
 
 1. Read `STATUS.md` fully — it is the live rehydration protocol and phase tracker.
 2. Read `Project_Requirements.md` (the brief: pillars, floors, banned outcomes, phases).
-3. Read `docs/R3F-WEBGPU-NOTES.md` (verified stack facts + 9 hard-won WebGPU/TSL
-   gotchas from this session — do NOT re-derive or re-debug these).
-4. Skim `docs/DEVIATIONS.md` (now D-1..D-4) and the newest `docs/DELTA.md` entry.
+3. Read `docs/R3F-WEBGPU-NOTES.md` (verified stack facts + hard-won WebGPU/TSL
+   gotchas — do NOT re-derive or re-debug these) and STATUS.md "Gotchas".
+4. Skim `docs/DEVIATIONS.md` (now D-1..D-5) and the newest `docs/DELTA.md` entry.
 5. **Never re-plan from scratch.** Continue from STATUS.md "Current focus".
 
 ### Goal
 
 Autonomously loop-engineer the brief's phase plan (user instruction: "loop engineer
 these features"). Phases 0–5 gated; a phase closes only after the verify battery,
-reference-delta, and a fresh-context `gate-verifier` agent dispatch.
+reference-delta, and a fresh-context `gate-verifier` agent dispatch. User protocol:
+**stop at each phase close for handoff + a fresh context window.**
 
-### Where we are (verified, all on `main`, tree clean at `9e5b920`)
+### Where we are (verified, all on `main`, tree clean at the Phase-1-close commit)
 
-- **Phase 0: CLOSED** — gate-verifier verdict PASS (independent battery re-run + per-item
-  evidence). Reference asset corrected: grade visuals against
-  **`reference/sector9_deck_hero.png`** (the lit 3D deck render), NOT
-  `media__new_visuals.png` (a flat menu card the brief mistakenly pointed at).
-- **Phase 1 (~80%): the game now runs WebGPU-only** — React 19.2.7 / fiber 9.6.1 /
-  drei 10.7.7 / rapier 2.2.0 / three 0.185.1, `WebGPURenderer` via async `gl` factory,
-  capability gate + designed unsupported screen (e2e-tested in a real no-adapter
-  browser). TSL procedural deck (~1.35M tris @ 60 fps, seeded via `?seed=N`), CSM
-  lighting rig, post stack (GTAO/bloom/CA/vignette/godrays) on three's own
-  PostProcessing. Pillar-A role gates enforced + unit/e2e tested (`isSolo` bypass is
-  dead). Zero external assets (fonts D-2, lobby PNG deleted). Bundle floor MET:
-  ~483 KB gzip ≤ 500 KB (three source-entry shim + rapier WASM chunk carve-out).
-  Mobile profile (emulated): 60 fps / 1.27M tris.
-- **Battery: PASS** (eslint 0 warnings, vitest 19, Playwright 3/3). Run
-  `node tools/verify.mjs` before claiming ANYTHING is done — STATUS.md line 11 governs.
+- **Phase 0: CLOSED** (2026-07-07, gate-verifier PASS). Grade visuals against
+  **`reference/sector9_deck_hero.png`**, NOT `media__new_visuals.png` (menu card only).
+- **Phase 1: CLOSED** (2026-07-08, gate-verifier PASS — independent 5/5 battery,
+  per-item evidence, zero banned outcomes). WebGPU-only game on React 19 / fiber 9.6 /
+  three 0.185 `WebGPURenderer` + TSL; **all §2 floors MET on the production build**:
+  desktop 60 fps / 2.02M tris / 484 KB gzip (dpr-1.5 canvas, 0.55-scale scene pass +
+  FXAA — D-5), mobile 60 fps / 1.89M tris (emulated). Verifier's Pillar-C flag
+  (near-black walls) was fixed post-verdict — root cause was ~1%-albedo dark metal
+  (`#0d1017`), not lighting — and re-verified (battery 5/5 after).
+- **Two false beliefs were killed this session — don't resurrect them:**
+  (1) prior "60 fps" STATUS claims did not reproduce (old probe sampled during
+  pipeline-compile warmup); the honest pre-optimization baseline was ~10 fps.
+  (2) The room had ZERO physics colliders since the Deck rebuild (rapier auto-colliders
+  skip `visible={false}` meshes) — players free-fell behind a rescue-teleport loop.
+  Fixed via `includeInvisible`; e2e now fails on any "fell through floor" warning.
+- **Battery: `node tools/verify.mjs --phase 1` → 5/5 HARD PASS.** perf-probe measures
+  the PRODUCTION build (`vite preview :4173`), waits out compile warmup, and runs a
+  GPU-contention canary (threshold 59) — verify.mjs retries perf steps ≤3× when the
+  canary flags a contended machine (user's Chrome busy = numbers invalid, not failed).
 
 ### What worked (keep doing)
 
-- The build loop: one coherent chunk per iteration → probe empirically in headless
-  Chromium (`--enable-unsafe-webgpu --use-angle=metal`) → battery → STATUS update →
-  commit. Screenshots + measured numbers before every "done" claim.
-- Verifying APIs against installed `node_modules` source before use (caught the async
-  `gl` factory contract, `drawCalls` vs `calls`, CA/GTAO node traps).
-- Fresh-context gate-verifier at phase gates (caught the wrong reference asset).
+- One coherent chunk per iteration → empirical probe in headless Chromium
+  (`--enable-unsafe-webgpu --use-angle=metal`) → battery → STATUS update → commit.
+- **Relative A/B measurement within one machine-load window** + the GPU canary to
+  reject contended windows; absolute floor claims only with a healthy canary.
+- Root-causing with pixel math instead of trusting eyeballs (the "black walls" were
+  albedo, not lights — two lighting raises did nothing until the material fix).
+- Fan-out: a tools-only subagent (battery wiring) + a read-only investigator (physics)
+  ran while the GPU-serial perf work continued inline — GPU measurements must never
+  run in parallel.
+- Fresh-context gate-verifier at the gate (its pixel-measured Pillar-C flag was real).
 
-### What didn't work (do NOT retry blind — details in docs/R3F-WEBGPU-NOTES.md)
+### What didn't work (do NOT retry blind)
 
-- React 19 `<StrictMode>` + fiber v9 async WebGPU factory → frame loop freezes, zero
-  errors. StrictMode stays OFF in `main.jsx`.
-- drei `<ContactShadows>` under WebGPU; reading `renderer.info` from `useFrame`;
-  `chromaticAberration` on computed chains / null center; component-wise GTAO multiply
-  (use `.r`); full-res GTAO at dpr 2 (~1 fps — run half-res/8-sample).
-- `scene.environment` from the PMREM probe bake (`render/EnvironmentProbe.jsx`) tanks
-  60→1 fps combined with the PostFX scene pass + cube shadows — built but NOT mounted
-  (D-4). Needs its own debugging round; do not simply re-mount it.
-- Unclamped `lerp(…, k*delta)` camera follow (pipeline-compile delta spikes → permanent
-  oscillation); 3D-tracked drei `<Html>` click targets (screen-fix them when open).
-- After editing `src/render/three-webgpu-shim.js`: `rm -rf client/node_modules/.vite`
-  (the dep optimizer inlines the old shim into cached pre-bundles).
+- All previous entries in docs/R3F-WEBGPU-NOTES.md + STATUS Gotchas still stand
+  (StrictMode×async factory; ContactShadows; renderer.info in useFrame; CA/GTAO traps;
+  EnvironmentProbe D-4 unmounted; shim edits need `.vite` cache clear).
+- NEW: drei `<AdaptiveDpr>` + a Canvas dpr clamp below device ratio = per-frame canvas
+  resize = full pipeline rebuild = 1 fps (removed).
+- NEW: `colliders="cuboid"` + `visible={false}` = no collider (needs `includeInvisible`).
+- NEW: glass `transmission > 0` costs a full-res scene copy + mips per frame (~20% of
+  scene pass) — keep alpha-only unless refraction is actually visible.
+- NEW: don't pipe `verify.mjs` through `tail` — it swallows the exit code.
 
-### Next steps (in order — Phase 1 gate close)
+### Next steps (Phase 2 — fresh session starts here)
 
-1. **Reference-delta round 1**: hero shot (`tools/capture-hero.mjs`) vs
-   `reference/sector9_deck_hero.png` → 10 ranked gaps in `docs/DELTA.md` → fix top 3
-   (include taming the blown hologram bloom) → re-render.
-2. Final 2M-triangle density turn (`DENSITY` constants in `client/src/render/Deck.jsx`)
-   under the full stack, holding 60 fps.
-3. Wire `tools/perf-probe.mjs --mode assert` into the battery (floors enforced from
-   Phase 1 on).
-4. Dispatch the `gate-verifier` agent on Phase 1 (gate text in
-   `Project_Requirements.md` §6); fix findings; check the box in STATUS.md.
-5. Then Phase 2: Puzzle 2 (tri-vector scanners, 3-role, latch/hold arm mechanic) +
-   the 1→2 chain server-side — see the brief §3.14 and the 2026-07-04 amendment in
-   STATUS.md "Current focus".
+1. **Puzzle 2 — Tri-Vector Hand Scanners** (brief §3.14): 3-role simultaneous arm
+   within a 1.5 s rolling window; each scanner LATCHES armed a few seconds so
+   solo-swap solves the identical puzzle across swaps; failure → lockout cooldown.
+   Server-side 1→2 chain; Pillar-A test proving 2 roles cannot complete it.
+2. **Pillar-D server-authority probe** (verifier rubric D=4): scripted client emits a
+   fabricated solve + teleport → assert authoritative state unchanged. Becomes real
+   with the server-side chain work.
+3. Reference-delta round (per phase, mandatory): biggest carried gaps = reactor
+   containment detail, ambient haze/motes, floor grime/wear.
+4. Gate: e2e solves P1→P2, lockout verified, server-authoritative, reference-delta —
+   then gate-verifier dispatch, fix findings, check the box, STOP for handoff.
 
 # Handoff (v0.2) — historical build log (original R3F v8 game)
 

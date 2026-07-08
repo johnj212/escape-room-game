@@ -283,7 +283,11 @@ export const Deck = () => {
       plate: deckPlateMaterial({ plateSize: layout.floor.size }),
       wall: wallPanelMaterial({ panelWidth: DENSITY.ribEvery }),
       structural: structuralMetalMaterial(),
-      dark: structuralMetalMaterial({ tone: '#0d1017' }),
+      // '#242c3a', not the old '#0d1017': a ~1%-albedo full-metal tone reads
+      // pure black under ANY light with no environment probe (D-4) — the
+      // 14K-greeble field was the near-black wall area the Phase-1
+      // gate-verifier flagged (Pillar C).
+      dark: structuralMetalMaterial({ tone: '#242c3a' }),
       cyan: neonMaterial({ tint: '#00f3ff', intensity: 2.4 }),
       magenta: neonMaterial({ tint: '#ff007f', intensity: 2.4 }),
       violet: neonMaterial({ tint: '#7f8fff', intensity: 1.8, flicker: 0.05 }),
