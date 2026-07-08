@@ -316,9 +316,41 @@ function phase1Manifest() {
   ]
 }
 
+// Phase 2 battery: same hard 1-3, then a new HARD Pillar-D check (server-authority probe,
+// tools/authority-probe.mjs — real server + 3 real socket.io-client connections proving
+// fabricated events, teleports, wrong-role/out-of-range actions, and stage-order violations
+// are all rejected, and that the legitimate P1->P2 chain and 3-role P2 solve still work) sits
+// between the e2e suite and the §2 perf floors, which remain HARD as in Phase 1.
+function phase2Manifest() {
+  return [
+    staticGateCheck(1),
+    unitTestsCheck(2),
+    e2eCheck(3),
+    {
+      id: 4,
+      name: 'Server-authority probe (Pillar D)',
+      hard: true,
+      async run() {
+        const res = await runCommand('node', ['tools/authority-probe.mjs'], {
+          timeoutMs: 3 * 60_000,
+        })
+        return {
+          pass: res.code === 0,
+          status: res.code === 0 ? 'PASS' : 'FAIL',
+          durationMs: res.durationMs,
+          note: res.code === 0 ? 'all authority assertions passed' : tail(res.stdout + res.stderr),
+        }
+      },
+    },
+    perfFloorsCheck(5, 'desktop'),
+    perfFloorsCheck(6, 'mobile'),
+  ]
+}
+
 const MANIFESTS = {
   0: phase0Manifest,
   1: phase1Manifest,
+  2: phase2Manifest,
 }
 
 // ---------------------------------------------------------------------------

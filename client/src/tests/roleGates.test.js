@@ -4,9 +4,11 @@ import path from 'path'
 import {
   switchboardAccess,
   cipherLegible,
+  scannerAccess,
   SWITCHBOARD_POS,
   HOLOGRAM_POS,
 } from '../game/roleGates'
+import { SCANNER_ROLES, SCANNER_POSITIONS } from '../../../shared/scannerPuzzle.js'
 
 // Pillar A, Puzzle 1 (2 roles): automated proof that the puzzle cannot be
 // driven by fewer than the required roles' sightline + inputs, and that
@@ -74,5 +76,38 @@ describe('Pillar A — Puzzle 1 role gates (no solo exemption)', () => {
     )
     expect(puzzleSource).not.toMatch(/role\s*===\s*'technician'\s*\|\|\s*isSolo/)
     expect(puzzleSource).not.toMatch(/isSolo\s*\|\|.*role\s*===/)
+  })
+})
+
+// Pillar A, Puzzle 2 (3 roles): each scanner pedestal arms only for its own
+// role standing at it. Every role × pedestal combination is enumerated —
+// combined with the shared machine's 2-role-subset proof
+// (tests/scannerPuzzle.test.js), no pair of roles can complete P2.
+describe('Pillar A — Puzzle 2 scanner gates (3 roles, no solo exemption)', () => {
+  it('every role × pedestal combination: arm iff the role matches and is in range', () => {
+    for (const scannerRole of SCANNER_ROLES) {
+      for (const viewerRole of SCANNER_ROLES) {
+        const atPedestal = viewer(viewerRole, at(SCANNER_POSITIONS[scannerRole]))
+        const expected = viewerRole === scannerRole ? 'arm' : 'role-locked'
+        expect(scannerAccess(atPedestal, scannerRole)).toBe(expected)
+        expect(scannerAccess(viewer(viewerRole, [15, 1.2, 15]), scannerRole)).toBe('out-of-range')
+      }
+    }
+  })
+
+  it('exactly one role can arm each pedestal — three distinct actors are structurally required', () => {
+    for (const scannerRole of SCANNER_ROLES) {
+      const armers = SCANNER_ROLES.filter(
+        (r) => scannerAccess(viewer(r, at(SCANNER_POSITIONS[scannerRole])), scannerRole) === 'arm'
+      )
+      expect(armers).toEqual([scannerRole])
+    }
+  })
+
+  it('scanner gates close outside the playing phase and on bad input', () => {
+    const eng = viewer('engineer', at(SCANNER_POSITIONS.engineer))
+    expect(scannerAccess(eng, 'engineer', 'lobby')).toBe('out-of-range')
+    expect(scannerAccess(null, 'engineer')).toBe('out-of-range')
+    expect(scannerAccess(eng, 'not-a-role')).toBe('out-of-range')
   })
 })

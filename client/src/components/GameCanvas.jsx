@@ -14,6 +14,7 @@ import { PostFX } from '../render/PostFX'
 import { Room } from './Room'
 import { Player } from './Player'
 import { WirePuzzle } from './WirePuzzle'
+import { ScannerStations } from './ScannerStations'
 
 // Harness instrumentation: exposes live render stats + a scene-ready flag on
 // `window` for the verification tooling (tools/perf-probe.mjs, PerfHud).
@@ -157,11 +158,15 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
       }}
       camera={{ position: [0, 5, 8], fov: 60 }}
     >
-      {/* Fog starts beyond the far wall distance (camera-to-wall runs
-          15-20 m) — the old 10..25 band was crushing every wall to the fog
-          color, which read as black (Pillar C). */}
+      {/* Fog band 13..42 (delta round 2, ambient haze): pulled in from 16..46
+          so the far half of the deck carries visible atmosphere, with a
+          slightly LIGHTER fog color so hazed surfaces drift toward airglow,
+          not black — the old 10..25 band crushed walls to fog-black (Pillar
+          C); wall band re-pixel-checked after this change. Linear fog, not
+          FogExp2: the exp2 variant measured ~1 fps (per-pixel exp() in every
+          material) in the 2026-07-08 re-bisect. */}
       <color attach="background" args={['#05060a']} />
-      <fog attach="fog" args={['#070a12', 16, 46]} />
+      <fog attach="fog" args={['#0b101b', 13, 42]} />
 
       {/* Lighting rig (render/Lighting.jsx): CSM key light, fixture-driven
           fills, sector washes, reactor glow — Pillars C + F. */}
@@ -177,6 +182,7 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
       <Physics gravity={[0, -9.81, 0]}>
         <Room />
         <WirePuzzle />
+        <ScannerStations />
         
         {/* Render all players in the room */}
         {Object.values(players).map((p) => (

@@ -9,6 +9,7 @@
 import {
   MeshStandardNodeMaterial,
   MeshPhysicalNodeMaterial,
+  MeshBasicNodeMaterial,
 } from 'three/webgpu'
 import {
   color,
@@ -60,8 +61,8 @@ export function deckPlateMaterial({ plateSize = 2 } = {}) {
   const local = fract(positionWorld.xz.div(plateSize)) // 0..1 within plate
 
   // Base steel with subtle per-plate value shift (breaks the tiling read).
-  const tint = cellRandom(cell).mul(0.05)
-  const base = mix(color('#181d26'), color('#232a38'), tint.add(0.35))
+  const plateRand = cellRandom(cell) // reused below for rust, not just tint
+  const base = mix(color('#181d26'), color('#232a38'), plateRand.mul(0.05).add(0.35))
 
   // Long directional scratches + fine wear noise.
   const scratches = brushedStreaks(1, positionWorld.x, positionWorld.z, 0.9, 14.0)
@@ -72,13 +73,38 @@ export function deckPlateMaterial({ plateSize = 2 } = {}) {
   const edgeZ = smoothstep(0.0, 0.06, local.y).mul(smoothstep(1.0, 0.94, local.y))
   const seam = edgeX.mul(edgeZ) // 1 inside, 0 at seams
 
-  mat.colorNode = mix(base.mul(0.55), base, seam).add(
-    vec3(scratches.mul(0.02))
-  )
+  // Delta round 2, gap #3 (floor grime/wear): the plate shader read as
+  // uniform clean tile against the reference's oil-stained, worn plating.
+  // Perf note: the first version of this spent THREE extra per-pixel noise
+  // evaluations across the frame's dominant surface and cost ~9 fps off the
+  // sacred floor (60 -> 51, measured via perf-probe). Cheapened to ONE new
+  // noise call by reusing fields that already exist for other purposes:
+  //  - grimeMask: one new low-frequency fractal call, large soot/oil patches
+  //  - puddleMask: a different threshold band on that SAME grime field
+  //    (no extra sampling) — glossy pooling reads naturally coincident with
+  //    the grimiest patches, which is physically sensible anyway
+  //  - rustMask: reuses `plateRand`, the per-plate cell-random already
+  //    computed for the base tint, thresholded near its top end — rare
+  //    whole-plate rust rather than a separate per-pixel noise field
+  // Cost history (2026-07-08 bisect, this file's noise-budget note applies):
+  // fractal-2 grime measured ~3 fps off the 60 floor on the frame's dominant
+  // surface; a SINGLE-octave mx_noise at the same low frequency reads nearly
+  // identical for the large soot/oil patches and halves the ALU again.
+  const grime = mx_noise_float(positionWorld.xz.mul(0.35)).mul(0.5).add(0.5)
+  const grimeMask = smoothstep(0.35, 0.78, grime)
+  const puddleMask = smoothstep(0.84, 0.95, grime)
+  const rustMask = smoothstep(0.9, 0.98, plateRand)
+
+  let col = mix(base.mul(0.55), base, seam).add(vec3(scratches.mul(0.02)))
+  col = mix(col, col.mul(0.5).add(vec3(0.012, 0.013, 0.015)), grimeMask.mul(0.75))
+  col = mix(col, color('#2e1a10'), rustMask.mul(0.4))
+  mat.colorNode = col
   mat.roughnessNode = float(0.42)
     .add(wear.mul(0.18))
     .add(scratches.mul(0.12))
-    .clamp(0.25, 0.85)
+    .add(grimeMask.mul(0.18))
+    .sub(puddleMask.mul(0.3))
+    .clamp(0.08, 0.9)
   mat.metalnessNode = float(0.85)
   return mat
 }
@@ -183,5 +209,36 @@ export function containmentGlassMaterial({ tint = '#8fd8ff', opacity = 0.16 } = 
   // Rim glow: brighter where glancing (cheap fresnel via view-normal falloff).
   const facing = normalWorld.dot(vec3(0, 0, 1)).abs()
   mat.emissiveNode = color(tint).mul(smoothstep(0.9, 0.2, facing).mul(0.25))
+  return mat
+}
+
+// -- atmosphere -------------------------------------------------------------
+
+/**
+ * Drifting dust motes. Unlit (MeshBasicNodeMaterial, not Standard): these
+ * render hundreds of instances and must never enter the PBR light loop —
+ * that loop is the measured desktop fps ceiling (docs/DEVIATIONS.md D-5).
+ * No depth-write so overlapping motes soften instead of z-fighting.
+ * Per-instance flicker only (no positional animation) — cheap, and Pillar
+ * F's "reads as one second from motion" is satisfied by the brightness
+ * instability alone, same trick as `neonMaterial`.
+ *
+ * Round-2 gotcha found the hard way: additive blending on hundreds of
+ * overlapping instances stacks past the bloom threshold wherever two or
+ * more motes overlap on screen — the bloom pass then blows each stack into
+ * a screen-space-sized halo, independent of the true (tiny) sphere size,
+ * turning "dust" into giant blurred orbs that ate the whole frame. Plain
+ * alpha blending (no stacking past 1.0) plus a low intensity ceiling keeps
+ * every mote comfortably under the bloom threshold.
+ */
+export function motesMaterial({ tint = '#cfe8ff' } = {}) {
+  const mat = new MeshBasicNodeMaterial()
+  mat.transparent = true
+  mat.depthWrite = false
+  const drift = mx_noise_float(vec2(time.mul(0.5), positionWorld.y.mul(2.4).add(positionWorld.x)))
+    .mul(0.5)
+    .add(0.5)
+  mat.colorNode = color(tint).mul(drift.mul(0.25).add(0.35))
+  mat.opacityNode = drift.mul(0.1).add(0.05)
   return mat
 }

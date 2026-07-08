@@ -28,8 +28,11 @@ import { sceneLights } from './lightRegistry'
 // Measured 2026-07-08: per-pixel shading breadth (PBR light loop + CSM taps
 // + fog + procedural noise) is the fps ceiling at desktop res with no single
 // dominant pass — resolution scale is the one lever that shrinks all of it.
-// 0.55 holds the §2 60-fps floor with margin for background-load noise.
-const DESKTOP_SCENE_SCALE = 0.55
+// 0.55 held the §2 60-fps floor at Phase-1 close; 0.53 (2026-07-08, Phase-2
+// re-bisect) pays for the Phase-2 deck additions (reactor containment
+// detail, scanner pedestals, floor grime, motes) — a 3.6% linear resolution
+// cut that is imperceptible under FXAA-after-tonemap. D-5 knob.
+const DESKTOP_SCENE_SCALE = 0.53
 
 // Post stack (§3.6) on three/webgpu's own PostProcessing + TSL display nodes
 // (the WebGL-only @react-three/postprocessing wrapper was retired at the
@@ -101,7 +104,10 @@ export const PostFX = ({ isMobile = false }) => {
       if (reactor && !fxoff.has('godrays')) {
         const shafts = godrays(depth, camera, reactor)
         shafts.resolutionScale = 0.35
-        shafts.raymarchSteps.value = 10
+        // 10 → 8 steps (2026-07-08 Phase-2 re-bisect): visually identical at
+        // 0.35-res, buys back part of the ~1 fps the Phase-2 deck additions
+        // (reactor containment detail + scanner pedestals) cost.
+        shafts.raymarchSteps.value = 8
         shafts.density.value = 0.55
         shafts.maxDensity.value = 0.34
         shafts.distanceAttenuation.value = 2.2

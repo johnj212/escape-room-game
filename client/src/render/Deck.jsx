@@ -8,6 +8,7 @@ import {
   neonMaterial,
   reactorCoreMaterial,
   containmentGlassMaterial,
+  motesMaterial,
 } from './materials'
 
 // Procedural Sector-9 deck visuals (§3.3, Pillar B): floor plating, wall
@@ -27,6 +28,7 @@ const DENSITY = {
   greebles: 14000, // wall greeble boxes
   cables: 200, // hanging ceiling cables
   ribEvery: 2, // wall rib spacing (m)
+  motes: 120, // ambient dust motes (delta round 2, gap #2; 360 → 120 in the fps re-bisect)
 }
 
 // Shared scratch objects for matrix composition.
@@ -222,10 +224,35 @@ function buildCeiling(seed) {
   return { beams, cross, cables }
 }
 
+function buildMotes(seed) {
+  const { half } = ROOM
+  const rng = streamFor(seed, 'motes')
+  const out = []
+  for (let i = 0; i < DENSITY.motes; i++) {
+    const x = -half + 0.8 + rng() * (half * 2 - 1.6)
+    const z = -half + 0.8 + rng() * (half * 2 - 1.6)
+    // Keep clear of the hero/gameplay camera's near-clip cone (z > -2 is
+    // close to the default spawn) — a tiny sphere a few cm from the lens
+    // reads as a huge soft blob (near-camera magnification), which is what
+    // blew the frame out before the blend-mode fix. Bias toward mid-room.
+    if (z > -1.5 && z < 3.5 && Math.abs(x) < 3) continue
+    const y = 0.6 + rng() * 6.2
+    const s = 0.4 + rng() * 0.9
+    out.push({ position: [x, y, z], scale: [s, s, s] })
+  }
+  return out
+}
+
 // ---- component ---------------------------------------------------------------
 
 export const Deck = () => {
   const seed = useMemo(() => getWorldSeed(), [])
+
+  // Delta round 2, gap #2 (ambient haze): handled by tightening GameCanvas's
+  // existing LINEAR fog band + the mote field below — NOT FogExp2. The exp2
+  // swap measured ~1 fps off the 60 floor (per-pixel exp() in every material
+  // across the frame) for a haze read the cheaper linear falloff also gives
+  // at these room distances (2026-07-08 re-bisect).
 
   const layout = useMemo(
     () => ({
@@ -234,6 +261,7 @@ export const Deck = () => {
       pipes: buildPipes(seed),
       greebles: buildGreebles(seed),
       ceiling: buildCeiling(seed),
+      motes: buildMotes(seed),
     }),
     [seed]
   )
@@ -275,6 +303,20 @@ export const Deck = () => {
       reactorRing: new THREE.TorusGeometry(1.68, 0.07, 36, 420),
       reactorStrut: new THREE.BoxGeometry(0.14, 6.4, 0.2),
       reactorDuct: new THREE.CylinderGeometry(0.75, 1.0, 1.6, 32),
+      // Delta round 2, gap #1 (reactor reads as a plain glowing ball): the
+      // core + one glass cylinder + 8 struts + 3 rings read as a smooth
+      // sphere behind bars, not the reference's heavy caged containment
+      // vessel. These add banded coil wraps, vertical window mullions on
+      // the glass, base vent/control boxes, diagonal cross-bracing and a
+      // blockier top header — all cheap instanced adds (~45K tris total,
+      // ~2% over the 2.02M floor) so the fps floor stays untouched.
+      reactorCoil: new THREE.TorusGeometry(1.58, 0.045, 8, 96),
+      reactorMullion: new THREE.BoxGeometry(0.06, 5.6, 0.05),
+      reactorVent: new THREE.BoxGeometry(0.34, 0.42, 0.28),
+      reactorBrace: new THREE.BoxGeometry(0.1, 1.5, 0.16),
+      reactorHeader: new THREE.BoxGeometry(1.7, 0.5, 1.7),
+      reactorSideDuct: new THREE.CylinderGeometry(0.32, 0.42, 1.0, 20),
+      mote: new THREE.SphereGeometry(0.035, 6, 4),
     }
   }, [layout.floor.size])
 
@@ -293,6 +335,7 @@ export const Deck = () => {
       violet: neonMaterial({ tint: '#7f8fff', intensity: 1.8, flicker: 0.05 }),
       core: reactorCoreMaterial(),
       glass: containmentGlassMaterial(),
+      motes: motesMaterial(),
     }),
     [layout.floor.size]
   )
@@ -374,8 +417,65 @@ export const Deck = () => {
           transforms={[1.2, 3.9, 6.6].map((y) => ({ position: [0, y, 0], rotation: [Math.PI / 2, 0, 0] }))}
           castShadow
         />
+        {/* Coil wraps banding the glass — sells "wound containment coil"
+            instead of a bare tube (delta round 2, gap #1). */}
+        <Instances
+          geometry={geo.reactorCoil}
+          material={mat.dark}
+          transforms={Array.from({ length: 9 }, (_, i) => ({
+            position: [0, 1.6 + i * 0.575, 0],
+            rotation: [Math.PI / 2, 0, 0],
+          }))}
+        />
+        {/* Vertical window mullions over the glass cylinder — breaks the
+            smooth-sphere read into a caged, windowed vessel. */}
+        <Instances
+          geometry={geo.reactorMullion}
+          material={mat.dark}
+          transforms={Array.from({ length: 10 }, (_, i) => {
+            const a = (i / 10) * Math.PI * 2
+            return { position: [Math.cos(a) * 1.52, 3.9, Math.sin(a) * 1.52], rotation: [0, -a, 0] }
+          })}
+        />
+        {/* Diagonal cross-bracing between struts, two height bands. */}
+        <Instances
+          geometry={geo.reactorBrace}
+          material={mat.dark}
+          transforms={Array.from({ length: 8 }, (_, i) => {
+            const a = ((i + 0.5) / 8) * Math.PI * 2
+            return [
+              { position: [Math.cos(a) * 1.62, 2.0, Math.sin(a) * 1.62], rotation: [0, -a, 0.34] },
+              { position: [Math.cos(a) * 1.62, 5.6, Math.sin(a) * 1.62], rotation: [0, -a, -0.34] },
+            ]
+          }).flat()}
+        />
+        {/* Base vent / control boxes — heavy-machinery skirt around the
+            plinth instead of bare metal. */}
+        <Instances
+          geometry={geo.reactorVent}
+          material={mat.dark}
+          transforms={Array.from({ length: 10 }, (_, i) => {
+            const a = (i / 10) * Math.PI * 2
+            return { position: [Math.cos(a) * 2.15, 0.65, Math.sin(a) * 2.15], rotation: [0, -a, 0] }
+          })}
+        />
+        {/* Blockier top header + side ducts replacing the single duct blob. */}
+        <mesh geometry={geo.reactorHeader} material={mat.dark} position={[0, 7.55, 0]} castShadow />
         <mesh geometry={geo.reactorDuct} material={mat.dark} position={[0, 7.2, 0]} castShadow />
+        {/* No castShadow: the main duct above already owns this silhouette,
+            and every caster repeats across 4 CSM cascades + 6 cube faces. */}
+        <Instances
+          geometry={geo.reactorSideDuct}
+          material={mat.structural}
+          transforms={[
+            { position: [0.9, 7.3, 0.4], rotation: [0, 0, 0.5] },
+            { position: [-0.9, 7.3, -0.4], rotation: [0, 0, -0.5] },
+          ]}
+        />
       </group>
+
+      {/* Ambient dust motes (delta round 2, gap #2) */}
+      <Instances geometry={geo.mote} material={mat.motes} transforms={layout.motes} receiveShadow={false} />
     </group>
   )
 }

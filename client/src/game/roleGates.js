@@ -6,6 +6,8 @@
 // flag — solo-swap is NOT an exemption from role separation (brief
 // amendment 2026-07-04): the solo player swaps characters to change role.
 
+import { SCANNER_POSITIONS, SCANNER_RANGE } from '../../../shared/scannerPuzzle.js'
+
 export const SWITCHBOARD_POS = [5, 0]
 export const HOLOGRAM_POS = [-5, 0]
 // 3 m interaction radius around a 1.3 m console: forgiving enough that a
@@ -34,6 +36,23 @@ export function switchboardAccess(viewer, gamePhase = 'playing', range = SWITCHB
   const inRange = distanceXZ(viewer.position, SWITCHBOARD_POS) < range
   if (!inRange) return 'out-of-range'
   return viewer.role === 'technician' ? 'open' : 'role-locked'
+}
+
+/**
+ * Puzzle 2 ACTION gate (Pillar A, 3 roles). Each scanner pedestal belongs to
+ * exactly one role: only that role, standing at that pedestal, can arm it —
+ * any other role in range is refused with a role lock. Combined with the
+ * shared machine (which needs all three role slots armed inside the rolling
+ * window), no subset of roles can complete P2. No solo parameter exists:
+ * the solo player swaps characters to act as each role.
+ * @returns {'arm'|'role-locked'|'out-of-range'}
+ */
+export function scannerAccess(viewer, scannerRole, gamePhase = 'playing', range = SCANNER_RANGE) {
+  if (!viewer || gamePhase !== 'playing') return 'out-of-range'
+  const pos = SCANNER_POSITIONS[scannerRole]
+  if (!pos) return 'out-of-range'
+  if (distanceXZ(viewer.position, pos) >= range) return 'out-of-range'
+  return viewer.role === scannerRole ? 'arm' : 'role-locked'
 }
 
 /**

@@ -94,7 +94,27 @@ export const useMultiplayer = () => {
       showToast(msg)
     })
 
+    // Puzzle 2: per-attempt arm feedback for THIS client (authoritative
+    // result — the room-state broadcast carries the state itself).
+    socket.on('scanner-result', ({ result }) => {
+      const messages = {
+        'failed-window': 'SCAN WINDOW MISSED — ARRAY LOCKOUT ENGAGED',
+        'rejected-lockout': 'SCANNER ARRAY IN LOCKOUT — STAND BY',
+        'rejected-locked': 'SCANNER ARRAY OFFLINE — SYNC THE POWER GRID FIRST',
+        solved: 'TRI-VECTOR LOCK CONFIRMED',
+      }
+      if (messages[result]) showToast(messages[result])
+    })
+
+    // Route store puzzle actions to the authoritative server (Pillar D:
+    // components call store actions; the store never solves locally online).
+    useGameStore.getState().registerNetEmitters({
+      toggleSwitch: (color) => socket.emit('toggle-switch', { color }),
+      armScanner: () => socket.emit('arm-scanner', {}),
+    })
+
     return () => {
+      useGameStore.getState().registerNetEmitters(null)
       if (socket) {
         socket.disconnect()
         socket = null

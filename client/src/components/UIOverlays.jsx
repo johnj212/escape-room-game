@@ -15,6 +15,7 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
   const toastMsg = useGameStore((state) => state.toastMsg)
   const myPlayerId = useGameStore((state) => state.myPlayerId)
   const resetGame = useGameStore((state) => state.resetGame)
+  const puzzleStage = useGameStore((state) => state.puzzleState.stage)
 
   // Lobby states
   const [name, setName] = useState('')
@@ -296,8 +297,13 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
 
         <div className="hud-objective">
           <div className="hud-objective-title">Current Objective</div>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            {activePlayerId === 'player-1' ? (
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }} data-testid="hud-objective-text">
+            {puzzleStage === 2 ? (
+              <span>
+                Tri-Vector Scanner Array online: all three operators must arm their own
+                vector scanner within the same 1.5s window. Miss it and the array locks out.
+              </span>
+            ) : activePlayerId === 'player-1' ? (
               <span>Stand near the left hologram console to read the flashing security wire sequence.</span>
             ) : activePlayerId === 'player-2' ? (
               <span>Approach the right terminal and toggle matching wires to align power switches.</span>
@@ -352,11 +358,11 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
       {(gamePhase === 'win' || gamePhase === 'lose') && (
         <div className="overlay-screen overlay-backdrop">
           <h1 className="overlay-title" style={{ color: gamePhase === 'win' ? '#39ff14' : '#ff3131' }}>
-            {gamePhase === 'win' ? 'GRID SYNCHRONIZED' : 'REACTOR MELTDOWN'}
+            {gamePhase === 'win' ? 'SECTOR-9 STABILIZED' : 'REACTOR MELTDOWN'}
           </h1>
           <p className="overlay-subtitle">
             {gamePhase === 'win'
-              ? 'Security override succeeded. Reactor core stabilized!'
+              ? 'Power grid synced, tri-vector lock confirmed. Reactor core stabilized!'
               : 'Core failure critical. Escape pod launch systems offline.'}
           </p>
           <div className="glass-panel" style={{ width: '320px', display: 'flex', flexDirection: 'column', gap: '15px' }}>

@@ -4,6 +4,24 @@ const http = require('http');
 const { Server } = require('socket.io');
 const gameLoop = require('./gameLoop');
 const puzzleEngine = require('./puzzleEngine');
+const {
+  armScanner,
+  activateScanners,
+  SCANNER_POSITIONS,
+  SCANNER_RANGE,
+} = require('../shared/scannerPuzzle.js');
+
+// P1 switchboard console position ([x, z]) — same forgiving radius as the P2 scanners.
+// Only the technician standing here may toggle a wire switch (Pillar D hardening).
+const SWITCHBOARD_POSITION = [5, 0];
+const SWITCHBOARD_RANGE = 3;
+
+// XZ-plane distance gate shared by the switchboard and the P2 scanner consoles.
+const inRangeXZ = (position, [px, pz], range) => {
+  const dx = position[0] - px;
+  const dz = position[2] - pz;
+  return Math.sqrt(dx * dx + dz * dz) < range;
+};
 
 const app = express();
 const server = http.createServer(app);
@@ -155,26 +173,70 @@ io.on('connection', (socket) => {
   });
 
   socket.on('toggle-switch', ({ color }) => {
+    if (!checkRateLimit(socket.id)) return;
     if (!currentRoomId) return;
     const room = gameLoop.getRoom(currentRoomId);
     if (!room || room.phase !== 'playing') return;
 
-    // Only allow toggle if user role is technician or engineer (optional, but keep simple)
+    // P1 only, and only while it's still the active stage.
+    if (room.puzzleState.stage !== 1 || room.puzzleState.p1.solved) return;
+
     const player = room.players[socket.id];
     if (!player) return;
 
-    const currentSwitches = room.puzzleState.currentSwitches;
+    // Pillar D hardening: role AND server-known position are authoritative — never trust
+    // the client. Only the technician standing at the switchboard may toggle.
+    if (player.role !== 'technician') {
+      socket.emit('error-msg', 'Only the technician may operate the switchboard.');
+      return;
+    }
+    if (!inRangeXZ(player.position, SWITCHBOARD_POSITION, SWITCHBOARD_RANGE)) {
+      socket.emit('error-msg', 'Too far from the switchboard.');
+      return;
+    }
+
+    const currentSwitches = room.puzzleState.p1.currentSwitches;
     if (currentSwitches[color] !== undefined) {
       currentSwitches[color] = !currentSwitches[color];
     }
 
     // Server-side validation
-    const isSolved = puzzleEngine.validatePuzzle(room.puzzleState);
+    const isSolved = puzzleEngine.validatePuzzle(room.puzzleState.p1);
     if (isSolved) {
-      room.puzzleState.solved = true;
+      room.puzzleState.p1.solved = true;
+      room.puzzleState.stage = 2;
+      room.puzzleState.p2 = activateScanners(room.puzzleState.p2);
+      // phase stays 'playing' — the chain continues into P2.
+    }
+
+    io.to(currentRoomId).emit('room-state', room);
+  });
+
+  socket.on('arm-scanner', () => {
+    if (!checkRateLimit(socket.id)) return;
+    if (!currentRoomId) return;
+    const room = gameLoop.getRoom(currentRoomId);
+    if (!room || room.phase !== 'playing') return;
+    if (room.puzzleState.stage !== 2) return;
+
+    // Role is resolved from the server's own player record — never trusted from the
+    // client payload (there is no payload at all for this event, by design).
+    const player = room.players[socket.id];
+    if (!player) return;
+
+    const scannerPos = SCANNER_POSITIONS[player.role];
+    if (!scannerPos || !inRangeXZ(player.position, scannerPos, SCANNER_RANGE)) {
+      socket.emit('error-msg', 'Too far from your scanner.');
+      return;
+    }
+
+    const { state, result } = armScanner(room.puzzleState.p2, player.role, Date.now());
+    room.puzzleState.p2 = state;
+    if (result === 'solved') {
       room.phase = 'win';
     }
 
+    socket.emit('scanner-result', { result });
     io.to(currentRoomId).emit('room-state', room);
   });
 

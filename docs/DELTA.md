@@ -21,6 +21,37 @@ Re-render: <path> — <what closed, what remains>
 
 ---
 
+## 2026-07-08 — Phase 2 — Scanner-array deck vs. reference (round 2)
+
+Shot: `docs/shots/phase2-hero-before.png` (pre-round) → `docs/shots/phase2-hero.png` (post-fix)
+Reference: `reference/sector9_deck_hero.png`
+
+Ranked differences at round start (carried gaps from round 1 re-verified against the actual shot):
+
+1. [high] Reactor reads as a plain glowing ball behind thin struts vs. the reference's heavy caged containment vessel (round-1 carry, biggest gap).
+2. [high] Air is optically clear — no ambient haze or drifting motes; the reference's atmosphere reads in every cubic meter (round-1 carry).
+3. [high] Floor reads as uniform clean tile vs. oil-stained, rust-pocked, worn plating (round-1 carry).
+4. [medium] Right wall band carries large near-black regions (61% of the sampled band < 5% luminance — same value as the accepted Phase-1 gate shot; carried, Phase-5 lighting pass).
+5. [medium] Reference walls are dense with machinery, conduit boxes and lit panels; ours are ribbed panelling only.
+6. [medium] Reference consoles are heavily greebled (cables, screens, switch banks); our consoles/pedestals are comparatively simple volumes.
+7. [medium] Volumetric fog in the reference pools through the whole frame; our shafts are reactor-local only.
+8. [medium] No hover droids in frame (reference has two detailed mechs) — Phase-5 scope, per round 1 #9.
+9. [low] No environmental signage/typographic identity (the reference's "SECTOR-9 COMMAND DECK" plate).
+10. [low] Partition energy beam is a clean strip vs. the reference's crackling arc texture.
+
+Fixed this round: #1, #2, #3 (each re-bisected against the 60-fps floor — first attempt cost 9 fps and was rebuilt cheaper; see the perf note below).
+Re-render: `docs/shots/phase2-hero.png` —
+- **#1 closed.** Reactor containment detail (Deck.jsx): 9 banded coil wraps, 10 vertical window mullions over the glass, 16 diagonal cross-braces in two height bands, 10 base vent/control boxes, blockier top header + twin side ducts (~36K tris, instanced). The core now reads as a caged industrial vessel.
+- **#2 closed.** Ambient haze via the existing linear fog pulled in to a 13–42 band with a lighter airglow color (`#0b101b`) + a 120-instance drifting mote field (unlit, alpha-blended, per-instance flicker). FogExp2 was tried first and REVERTED: ~1 fps (per-pixel `exp()` in every material) for no visible gain over the linear band at room distances.
+- **#3 closed.** deckPlateMaterial grime: large soot/oil patches (single-octave low-frequency noise), glossy puddle band thresholded from the same field, rare per-plate rust reusing the existing cell-random — one new noise call total; the fractal version cost ~3 fps and was cheapened.
+- Wall bands pixel-checked before/after: byte-identical to the Phase-1 gate shot — no Pillar-C regression from the fog change (#4 unchanged, carried).
+
+**Perf note (fps-floor re-bisect, 2026-07-08):** the round's first draft (fractal grime + 360 additive motes + FogExp2) measured 51 fps vs the 60 floor. Rebuilt to the shipped config (above) + godrays 10→8 steps + scene scale 0.55→0.53 (D-5 knobs, both imperceptible) + shadow-caster trim on pedestals/side-ducts. HEAD-relative A/B in the same machine window: HEAD 60 fps / this tree 59 → then the window degraded (59→56→55 on successively CHEAPER configs, GPU canary healthy throughout — the raw-ALU canary is blind to CPU/compositor contention). Final idle-machine `perf-probe --mode assert` is REQUIRED at the battery/gate step; not claiming the floor met until then.
+
+Remains (re-ranked for the next round): #4 right-wall near-black band, #5 wall machinery density, #7 room-wide volumetrics, #10 beam arc texture; #8 droids stay Phase-5.
+
+---
+
 ## 2026-07-07 — Phase 1 — First WebGPU deck render vs. the true reference (round 1)
 
 Shot: `docs/shots/phase1-hero.png` (via `tools/capture-hero.mjs --phase 1`)

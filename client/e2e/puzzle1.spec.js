@@ -138,7 +138,7 @@ test.describe('App boot + solo-swap solve of Puzzle 1 (Decoupled Power Grid)', (
     // Read the cipher the Engineer's hologram displays (Puzzle 1's
     // "information" half) directly from authoritative client state - this is a
     // read-only assertion of what the hologram shows, not a solve shortcut.
-    const cipher = await page.evaluate(() => window.useGameStore.getState().puzzleState.cipher)
+    const cipher = await page.evaluate(() => window.useGameStore.getState().puzzleState.p1.cipher)
     expect(Array.isArray(cipher)).toBe(true)
     expect(cipher.length).toBeGreaterThan(0)
 
@@ -187,12 +187,24 @@ test.describe('App boot + solo-swap solve of Puzzle 1 (Decoupled Power Grid)', (
       await page.locator('.puzzle-wire-card', { hasText: new RegExp(`^${color}$`, 'i') }).click()
     }
 
-    // 7. Server-free solo validation (gameStore.toggleSwitch) flips the game to
-    // 'win' ~1s after the correct combination is set. Assert the real win screen.
-    await expect(page.getByText('GRID SYNCHRONIZED')).toBeVisible({ timeout: 5_000 })
+    // 7. Server-free solo validation (gameStore.toggleSwitch) marks P1 solved
+    // and ADVANCES THE CHAIN: since Phase 2, solving the power grid no longer
+    // wins the game — it unlocks the stage-2 Tri-Vector Scanner Array
+    // (puzzle2.spec.js carries the chain to the win). Assert the solved
+    // terminal feedback and the authoritative chain transition.
+    await expect(page.getByText('GRID SYNCHRONIZED — SCANNER ARRAY ONLINE')).toBeVisible({
+      timeout: 5_000,
+    })
     await expect
-      .poll(() => page.evaluate(() => window.useGameStore.getState().gamePhase))
-      .toBe('win')
+      .poll(() => page.evaluate(() => window.useGameStore.getState().puzzleState.stage))
+      .toBe(2)
+    const afterP1 = await page.evaluate(() => {
+      const s = window.useGameStore.getState()
+      return { phase: s.gamePhase, p1Solved: s.puzzleState.p1.solved, p2Status: s.puzzleState.p2.status }
+    })
+    expect(afterP1.phase).toBe('playing') // no premature win
+    expect(afterP1.p1Solved).toBe(true)
+    expect(afterP1.p2Status).toBe('active')
 
     expect(physicsRescues).toEqual([])
     // 8. Zero console exceptions across the entire flow (Pillar E rule).

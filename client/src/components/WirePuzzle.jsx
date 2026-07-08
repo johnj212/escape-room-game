@@ -177,7 +177,7 @@ export const WirePuzzle = () => {
             projector range (Pillar A information gate). Everyone else sees
             encrypted static. */}
         {cipherLegible
-          ? puzzleState.cipher.map((color, index) => (
+          ? puzzleState.p1.cipher.map((color, index) => (
               <mesh key={index} position={[0, 0.3 - index * 0.3, 0.03]}>
                 <boxGeometry args={[1.2, 0.08, 0.02]} />
                 <meshBasicMaterial color={getColorHex(color)} transparent opacity={0.8} blending={THREE.AdditiveBlending} />
@@ -254,7 +254,7 @@ export const WirePuzzle = () => {
 
       {/* 4 physical wire sockets with colored LED rings on the Switch Board face */}
       {['red', 'blue', 'green', 'yellow'].map((colorName, idx) => {
-        const isSwitchedOn = puzzleState.currentSwitches[colorName]
+        const isSwitchedOn = puzzleState.p1.currentSwitches[colorName]
         const colorHex = getColorHex(colorName)
         
         // Position sockets on the tilted face (console center is at x=5, y=0.5, z=0)
@@ -344,8 +344,8 @@ export const WirePuzzle = () => {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                {Object.keys(puzzleState.currentSwitches).map((color) => {
-                  const isActive = puzzleState.currentSwitches[color]
+                {Object.keys(puzzleState.p1.currentSwitches).map((color) => {
+                  const isActive = puzzleState.p1.currentSwitches[color]
                   return (
                     <div
                       key={color}
@@ -366,7 +366,7 @@ export const WirePuzzle = () => {
                 })}
               </div>
 
-              {puzzleState.solved && (
+              {puzzleState.p1.solved && (
                 <div style={{
                   color: '#39ff14',
                   fontSize: '0.8rem',
@@ -374,7 +374,7 @@ export const WirePuzzle = () => {
                   textAlign: 'center',
                   fontFamily: 'var(--font-hud)'
                 }}>
-                  GRID SYNCHRONIZED
+                  GRID SYNCHRONIZED — SCANNER ARRAY ONLINE
                 </div>
               )}
             </div>

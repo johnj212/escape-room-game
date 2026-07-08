@@ -54,18 +54,56 @@ describe('Zustand Game Store', () => {
     // Reset state to ensure solo is true and we have clean switches
     useGameStore.getState().setIsSolo(true)
     useGameStore.getState().resetGame()
-    
-    const cipher = useGameStore.getState().puzzleState.cipher
+
+    const cipher = useGameStore.getState().puzzleState.p1.cipher
     expect(cipher).toHaveLength(3)
 
     // Toggle a random color not in the cipher (e.g. yellow if it's not in, or check a direct toggle)
     const targetColor = 'red'
-    const isRedInitiallyActive = useGameStore.getState().puzzleState.currentSwitches.red
-    
+    const isRedInitiallyActive = useGameStore.getState().puzzleState.p1.currentSwitches.red
+
     useGameStore.getState().toggleSwitch(targetColor)
-    
-    const isRedActiveNow = useGameStore.getState().puzzleState.currentSwitches.red
+
+    const isRedActiveNow = useGameStore.getState().puzzleState.p1.currentSwitches.red
     expect(isRedActiveNow).toBe(!isRedInitiallyActive)
+  })
+
+  it('solo P1 solve advances the chain to stage 2 (scanners online) instead of winning', () => {
+    useGameStore.getState().setIsSolo(true)
+    useGameStore.getState().resetGame()
+    useGameStore.getState().setGamePhase('playing')
+
+    const { cipher } = useGameStore.getState().puzzleState.p1
+    for (const color of cipher) useGameStore.getState().toggleSwitch(color)
+
+    const { puzzleState, gamePhase } = useGameStore.getState()
+    expect(puzzleState.p1.solved).toBe(true)
+    expect(puzzleState.stage).toBe(2)
+    expect(puzzleState.p2.status).toBe('active')
+    expect(gamePhase).toBe('playing') // win now requires the full 1 → 2 chain
+  })
+
+  it('solo P2: three role arms inside the window solve; the store routes through the shared machine', () => {
+    useGameStore.getState().setIsSolo(true)
+    useGameStore.getState().resetGame()
+    useGameStore.getState().setGamePhase('playing')
+    const { cipher } = useGameStore.getState().puzzleState.p1
+    for (const color of cipher) useGameStore.getState().toggleSwitch(color)
+
+    // Swap-arm all three roles back-to-back (well inside the 1.5 s window).
+    expect(useGameStore.getState().armScanner('engineer')).toBe('armed')
+    expect(useGameStore.getState().armScanner('technician')).toBe('armed')
+    expect(useGameStore.getState().armScanner('overseer')).toBe('solved')
+    expect(useGameStore.getState().puzzleState.p2.solved).toBe(true)
+  })
+
+  it('solo P2 arming is rejected while stage 1 (chain order is enforced)', () => {
+    useGameStore.getState().setIsSolo(true)
+    useGameStore.getState().resetGame()
+    useGameStore.getState().setGamePhase('playing')
+    expect(useGameStore.getState().puzzleState.stage).toBe(1)
+    expect(useGameStore.getState().armScanner('engineer')).toBeNull()
+    expect(useGameStore.getState().puzzleState.p2.armedAt.engineer).toBeNull()
   })
 
   it('should set safe spawn heights upon resetting the game', () => {

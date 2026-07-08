@@ -18,6 +18,7 @@
     "concurrently": "^8.2.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1"
+    "@playwright/test": "^1.61.1",
+    "socket.io-client": "^4.8.3"
   }
 }

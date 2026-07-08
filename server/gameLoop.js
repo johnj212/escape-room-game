@@ -1,5 +1,6 @@
 // server/gameLoop.js
 const puzzleEngine = require('./puzzleEngine');
+const { tickScanners } = require('../shared/scannerPuzzle.js');
 
 const rooms = {}; // { [roomId]: roomState }
 // roomState structure:
@@ -8,7 +9,7 @@ const rooms = {}; // { [roomId]: roomState }
 //   phase: 'lobby' | 'playing' | 'win' | 'lose',
 //   timer: number,
 //   players: { [id]: { id, name, role, position, rotation, isReady } },
-//   puzzleState: { cipher, currentSwitches, solved }
+//   puzzleState: { stage: 1|2, p1: { cipher, currentSwitches, solved }, p2: <scanner state> }
 // }
 
 let ioRef = null;
@@ -21,6 +22,12 @@ const initGameLoop = (io) => {
     Object.keys(rooms).forEach((roomId) => {
       const room = rooms[roomId];
       if (room.phase !== 'playing') return;
+
+      // P2 scanners run their own pure clock-driven state machine: latch expiry and
+      // lockout expiry both happen here, independent of any player action this tick.
+      if (room.puzzleState.stage === 2) {
+        room.puzzleState.p2 = tickScanners(room.puzzleState.p2, Date.now());
+      }
 
       // Decrement timer based on actual elapsed ticks (30Hz = 30 ticks per second)
       // For simplicity, we track time using seconds and tick decrements

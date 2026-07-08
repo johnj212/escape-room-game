@@ -7,7 +7,43 @@
 
 ---
 
-## 0. Current session handoff (2026-07-08) — READ FIRST
+## 0. Current session handoff (2026-07-08, second session — Phase 2 feature-complete) — READ FIRST
+
+### Rehydration: read STATUS.md fully (esp. "Phase 2 progress" + the three new
+### Gotchas), the brief, docs/R3F-WEBGPU-NOTES.md, docs/DEVIATIONS.md, and the
+### newest docs/DELTA.md entry (2026-07-08 round 2). Never re-plan from scratch.
+
+### Where we are
+
+**Phase 2 is FEATURE-COMPLETE and committed; the gate is NOT closed.** Everything
+in STATUS.md "Phase 2 progress" is tool-verified except the perf floors. What
+remains, in order, on an IDLE machine:
+
+1. `node tools/verify.mjs --phase 2` (manifest now: lint / vitest / e2e /
+   authority-probe / desktop floors / mobile floors). Desktop fps is the open
+   question: HEAD-vs-tree A/B measured 60 vs 59, then the machine-load window
+   went bad (cheaper configs measured LOWER — 59→56→55 — with a healthy GPU
+   canary; that canary is blind to CPU/compositor contention, see Gotchas).
+   If an idle run still misses 60 by 1: the D-5 knobs already spent this
+   session were scene scale 0.55→0.53 and godrays 10→8; next cheapest are a
+   further scale notch or trimming the reactor-detail instance counts.
+2. Dispatch a fresh-context `gate-verifier`; fix findings; check the Phase-2
+   box in STATUS.md; STOP for handoff (user protocol: fresh window per phase).
+
+### What worked / what didn't this session (append to the lists below)
+
+- Fan-out worked: server track (chain + authority probe, sonnet subagent) and
+  client track (this session inline) built against a shared contract module
+  written FIRST (`shared/scannerPuzzle.js`) — zero integration friction.
+- The delta-round subagent hit the spend limit mid-optimization; its visual
+  work was sound but its fps re-bisect had to be finished inline. Its first
+  draft cost 9 fps (fractal grime / FogExp2 / 360 additive motes) — costs and
+  cheap replacements are documented in DELTA.md round 2's perf note.
+- Do NOT trust perf numbers from a window where cheaper configs measure lower
+  (see the canary-blind-spot gotcha in STATUS.md). Late-session numbers here
+  were invalid; nothing was concluded from them.
+
+# Previous session handoff (2026-07-08, Phase-1 close) — kept for its lessons
 
 ### Rehydration (do this before touching anything)
 
