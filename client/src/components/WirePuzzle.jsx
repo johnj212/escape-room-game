@@ -89,6 +89,20 @@ export const WirePuzzle = () => {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [nearSwitchBoard])
 
+  // Mobile USE button (dispatched by UIOverlays as 'mobile-interact') needs
+  // the same toggle the keyboard gets — it was previously only landing in
+  // usePlayerControls' inputRef, which nothing here read (Pillar E: every
+  // action reachable on touch and keyboard).
+  useEffect(() => {
+    const handleMobileInteract = (e) => {
+      if (e.detail?.active && nearSwitchBoard) {
+        setShowSwitchBoardUI(prev => !prev)
+      }
+    }
+    window.addEventListener('mobile-interact', handleMobileInteract)
+    return () => window.removeEventListener('mobile-interact', handleMobileInteract)
+  }, [nearSwitchBoard])
+
   // Get color hex values
   const getColorHex = (colorName) => {
     switch (colorName) {

@@ -239,6 +239,17 @@ export const ScannerStations = () => {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [tryArm])
 
+  // Mobile USE button (dispatched by UIOverlays as 'mobile-interact') mirrors
+  // the keyboard arm — it previously only updated usePlayerControls' inputRef,
+  // which nothing here read.
+  useEffect(() => {
+    const onMobileInteract = (e) => {
+      if (e.detail?.active) tryArm()
+    }
+    window.addEventListener('mobile-interact', onMobileInteract)
+    return () => window.removeEventListener('mobile-interact', onMobileInteract)
+  }, [tryArm])
+
   return (
     <group>
       {SCANNER_ROLES.map((role) => (

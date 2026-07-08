@@ -39,6 +39,8 @@ Build the Sector-9 Command Deck: a 3-role, high-cooperation escape room (Enginee
 
 ## Current focus
 
+**User reported issue with mobile, the use button does not acitive the item, unlike on dektop where space bar triggers the wire puzzle. The agent should address this issue and add a mobile test before proceeding.**
+
 **Brief amended 2026-07-04 (design decision — read before Phase 1/2/3).** `Project_Requirements.md` was tightened on role interdependence, integrated into Pillar A, the puzzle list (§3), the every-puzzle quality law (§4), and the phase gates (§6): (1) **P1 = 2 roles, P2 and P3 = all 3 roles**, with a Pillar-A test proving the required role count is necessary; (2) **solo-swap is no longer a role exemption** — the `isSolo` bypass at `WirePuzzle.jsx:47` that collapses Engineer+Technician into one free actor must be removed when P1 is re-homed in Phase 1 (a test proves the solo player must swap Engineer → Technician); (3) simultaneous P2 uses a **latch/hold arm mechanic** so solo-swap solves the *identical* puzzle (arm all three within a rolling window), never a relaxed variant. No pillar/floor dropped — this raises the bar, so no `docs/DEVIATIONS.md` entry.
 
 Phase 0 in progress. Operating files scaffolded (this file, `docs/DELTA.md`, `docs/DEVIATIONS.md`, `docs/R3F-WEBGPU-NOTES.md`, `tools/`). `reference/media__new_visuals.png` copied in.

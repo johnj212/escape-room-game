@@ -32,6 +32,13 @@ const io = new Server(server, {
   }
 });
 
+// ⚠️  NGROK TESTING ONLY - DELETE BEFORE COMMIT
+// Serve built client files (client/dist) from Express root
+// This allows single-server deployment for ngrok testing.
+// For production, use a separate static file host or CDN.
+const path = require('path');
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
 // Simple Rate Limiter state
 const socketActionTracker = {}; // { [socketId]: { count, timestamp } }
 

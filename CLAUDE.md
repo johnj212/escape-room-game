@@ -21,6 +21,35 @@ npm run test --prefix client    # vitest unit tests (src/tests)
 npm run e2e --prefix client     # playwright e2e (client/e2e)
 ```
 
+## ngrok Testing (Public Internet)
+
+**Setup (one-time):**
+1. Install ngrok: `brew install ngrok`
+2. Create free account at https://dashboard.ngrok.com/signup
+3. Get auth token from https://dashboard.ngrok.com/get-started/your-authtoken
+4. Authenticate: `ngrok config add-authtoken YOUR_TOKEN`
+
+**To test on public internet:**
+```bash
+npm run build                           # build client
+npm run dev:server                      # start server (serves both client + Socket.IO)
+ngrok http 3001 --region us            # in another terminal
+```
+
+Visit: `https://your-ngrok-url.ngrok-free.dev`
+
+**⚠️ IMPORTANT — Cleanup before committing:**
+- `server/index.js`: Remove static file serving (lines marked "NGROK TESTING ONLY")
+- `client/src/hooks/useMultiplayer.js`: Revert Socket.IO connection to `io('http://localhost:3001')`
+- Both files have comments marking what to delete
+
+**For local dev after ngrok testing:**
+```bash
+npm run dev                # back to concurrent server + Vite dev client
+```
+
+**ngrok dashboard:** http://localhost:4040 (view all traffic)
+
 ## Architecture
 - `client/src/render/` — WebGPU/TSL layer: `Deck.jsx` (procedural geometry), `materials.js` (TSL material library), `Lighting.jsx` + `lightRegistry.js` (CSM rig), `PostFX.jsx` (GTAO/bloom/CA/vignette), `EnvironmentProbe.jsx` (PMREM), `capability.js` (WebGPU gate + reason codes), `prng.js` (seeded procedural), `three-webgpu-shim.js`.
 - `client/src/components/` — R3F scene + UI: `GameCanvas.jsx`, `Room.jsx`, `Player.jsx`, `WirePuzzle.jsx`, `PerfHud.jsx`, `LoadingScreen.jsx`, `UnsupportedScreen.jsx`, `UIOverlays.jsx`.

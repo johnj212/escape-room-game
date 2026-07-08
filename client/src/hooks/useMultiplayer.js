@@ -25,8 +25,12 @@ export const useMultiplayer = () => {
       return
     }
 
-    // Connect to Socket.io server (port 3001)
-    socket = io('http://localhost:3001', {
+    // Connect to Socket.io server
+    // ⚠️  NGROK TESTING ONLY - This connection strategy should be reverted after ngrok testing
+    // Socket.IO will auto-connect to the current origin (same host/port) when no URL provided.
+    // This allows the client (served by Express) to connect to the server on the same origin,
+    // whether that's localhost:3001 or https://your-ngrok-url.ngrok-free.dev
+    socket = io(undefined, {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     })
