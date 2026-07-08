@@ -21,7 +21,7 @@
 
 export const SCANNER_ROLES = ['engineer', 'technician', 'overseer']
 
-export const ARM_WINDOW_MS = 1500 // rolling window: max spread of the 3 armedAt stamps
+export const ARM_WINDOW_MS = 3000 // rolling window: max spread of the 3 armedAt stamps
 export const LATCH_MS = 4000 // armed persistence after activation
 export const LOCKOUT_MS = 5000 // cooldown after a failed attempt
 
