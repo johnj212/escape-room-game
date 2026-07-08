@@ -174,25 +174,54 @@ function e2eCheck(id) {
 // (§2 floors: desktop fps>=60 / tris>=2M / JS+CSS gzip<=500KB excl. rapier-wasm chunk;
 // mobile fps>=30 / tris>=0.5M — the floors live in perf-probe's FLOORS table).
 // perf-probe builds the client as part of its run, hence the 10-minute timeout.
+// Settle window before each perf measurement: the preceding battery steps
+// (playwright, client builds) leave the machine busy — macOS Spotlight
+// re-indexes fresh dist/ output, filesystem caches flush — and fps sampled
+// in that residue reads several fps below steady state (measured 54 vs 60,
+// 2026-07-08). Measurement hygiene, not a floor change.
+const PERF_SETTLE_MS = 25_000
+
+// A perf run whose GPU canary flags environment contention is INVALID, not
+// failed — other processes were eating the GPU, so the number says nothing
+// about the build (see perf-probe's canary comment). Retry up to
+// PERF_MAX_ATTEMPTS with a settle between attempts; if every attempt is
+// contended, report FAIL honestly with the contention note (never a fake
+// pass) — re-run the battery on an idle machine.
+const PERF_MAX_ATTEMPTS = 3
+
 function perfFloorsCheck(id, profile) {
   return {
     id,
     name: `Perf floors ${profile} (perf-probe assert)`,
     hard: true,
     async run() {
-      const res = await runCommand(
-        'node',
-        ['tools/perf-probe.mjs', '--mode', 'assert', '--profile', profile],
-        { timeoutMs: 10 * 60_000 },
-      )
+      let last
+      const start = Date.now()
+      for (let attempt = 1; attempt <= PERF_MAX_ATTEMPTS; attempt++) {
+        console.log(`[verify] settling ${PERF_SETTLE_MS / 1000}s before the ${profile} perf measurement (attempt ${attempt}/${PERF_MAX_ATTEMPTS})...`)
+        await new Promise((r) => setTimeout(r, PERF_SETTLE_MS))
+        last = await runCommand(
+          'node',
+          ['tools/perf-probe.mjs', '--mode', 'assert', '--profile', profile],
+          { timeoutMs: 10 * 60_000 },
+        )
+        if (last.code === 0) {
+          return {
+            pass: true,
+            status: 'PASS',
+            durationMs: Date.now() - start,
+            note: `§2 ${profile} floors met` + (attempt > 1 ? ` (attempt ${attempt}: earlier attempts were environment-contended)` : ''),
+          }
+        }
+        const contended = /CONTENDED environment/.test(last.stdout + last.stderr)
+        if (!contended) break // a clean-environment miss is a real miss
+        console.log(`[verify] ${profile} perf attempt ${attempt} was environment-contended (GPU canary below threshold) — ${attempt < PERF_MAX_ATTEMPTS ? 'retrying' : 'out of attempts'}`)
+      }
       return {
-        pass: res.code === 0,
-        status: res.code === 0 ? 'PASS' : 'FAIL',
-        durationMs: res.durationMs,
-        note:
-          res.code === 0
-            ? `§2 ${profile} floors met`
-            : tail(res.stdout + res.stderr),
+        pass: false,
+        status: 'FAIL',
+        durationMs: Date.now() - start,
+        note: tail(last.stdout + last.stderr),
       }
     },
   }

@@ -1,9 +1,9 @@
 {
   "phase": 1,
-  "timestamp": "2026-07-08T05:46:05.321Z",
-  "overallPass": false,
+  "timestamp": "2026-07-08T06:18:27.574Z",
+  "overallPass": true,
   "hardTotal": 5,
-  "hardPassed": 4,
+  "hardPassed": 5,
   "checks": [
     {
       "id": 1,
@@ -11,7 +11,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 2031,
+      "durationMs": 1177,
       "note": "0 warnings/errors"
     },
     {
@@ -20,7 +20,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 2108,
+      "durationMs": 1202,
       "note": "all specs passed"
     },
     {
@@ -29,17 +29,17 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 13065,
+      "durationMs": 7339,
       "note": "e2e suite green"
     },
     {
       "id": 4,
       "name": "Perf floors desktop (perf-probe assert)",
       "hard": true,
-      "pass": false,
-      "status": "FAIL",
-      "durationMs": 40066,
-      "note": "[dev-server] reusing existing server at http://localhost:5173\n[perf-probe] GPU canary: 39.5 fps (raw fullscreen ALU @2880x1620) — BELOW 50: environment is GPU-contended, game numbers biased low\n[perf-probe] warmup: waiting for fps to stabilize (min 12s, cap 40s, ±20% between consecutive 1s polls)...\n[perf-probe] warmup: stabilized after 12.4s (fps 32 → 32)\n[perf-probe] sampling __PERF__ for 8000ms (desktop)...\n[perf-probe] building client (`npm run build --prefix client`)...\n\nperf-probe results (WebGPU build, Phase 1)\n---------------------------------------------\nprofile                   : desktop\nfps (median)              : 37\ndrawCalls (median)        : 408\ntriangles (median)        : 2021744\nsamples                   : 56\nGPU canary                : 39.5 fps — CONTENDED environment (game fps biased low; re-run idle)\nwarmup settle             : 12.4s\nwarmup stabilized         : yes\nJS+CSS gzip (excl. .wasm) : 484.3 KB\nJS+CSS files measured     : 2\n.wasm files excluded      : 1\n---------------------------------------------\n[perf-probe] ASSERT FAILED (desktop):\n  - fps 37 < floor 60\n[perf-probe] NOTE: GPU canary 39.5 < 50 — the environment is GPU-contended; re-run on an idle machine before concluding the BUILD misses the floor.\n"
+      "pass": true,
+      "status": "PASS",
+      "durationMs": 68137,
+      "note": "§2 desktop floors met"
     },
     {
       "id": 5,
@@ -47,7 +47,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 40893,
+      "durationMs": 67861,
       "note": "§2 mobile floors met"
     }
   ]

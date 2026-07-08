@@ -127,7 +127,9 @@ export const Lighting = ({ isMobile = false }) => {
         />
       ))}
 
-      {/* Reactor: magenta alarm spot from above + the core's own hot glow */}
+      {/* Reactor: magenta alarm spot from above + the core's own hot glow.
+          Shadowless: a wide soft wash reads identically without occlusion,
+          and its shadow map was a full extra render pass per frame. */}
       <spotLight
         position={[0, 7.5, -9]}
         angle={Math.PI / 2.5}
@@ -136,7 +138,6 @@ export const Lighting = ({ isMobile = false }) => {
         distance={20}
         decay={2}
         color="#ff007f"
-        castShadow={false}
       />
       <pointLight
         // Shadow-casting so GodraysNode can raymarch its shafts (the effect

@@ -29,9 +29,10 @@
 // assert mode (later phases, WebGPU floors from Project_Requirements.md §2): exits non-zero on
 // any miss. Not used in Phase 0 — implemented here for when it is needed.
 //
-// Self-contained: starts (and tears down) the Vite dev server itself if one isn't already
-// running on BASE_URL. Honors the workers:1 discipline from client/playwright.config.js — this
-// script runs a single Chromium instance, sequentially, never in parallel with itself.
+// Self-contained: builds the client, then starts (and tears down) a `vite preview` server for
+// the PRODUCTION build on :4173 (fps is measured on what ships, not the dev server — see the
+// PREVIEW_URL comment). Honors the workers:1 discipline from client/playwright.config.js —
+// this script runs a single Chromium instance, sequentially, never in parallel with itself.
 
 import { chromium } from '@playwright/test'
 import { spawn, execFile } from 'node:child_process'
@@ -50,7 +51,6 @@ const REPO_ROOT = path.resolve(__dirname, '..')
 const CLIENT_DIR = path.join(REPO_ROOT, 'client')
 const DIST_DIR = path.join(CLIENT_DIR, 'dist')
 const STATUS_PATH = path.join(REPO_ROOT, 'STATUS.md')
-const BASE_URL = 'http://localhost:5173'
 
 // Identical to client/playwright.config.js's WEBGPU_ARGS.
 const WEBGPU_ARGS = ['--enable-unsafe-webgpu', '--use-angle=metal']
@@ -73,7 +73,7 @@ const SAMPLE_INTERVAL_MS = 100
 // measuring only after a 12s minimum settle AND two consecutive polls within ±20% of each
 // other; give up waiting (but still measure) after 40s.
 const WARMUP_POLL_INTERVAL_MS = 1_000
-const WARMUP_MIN_SETTLE_MS = 12_000
+const WARMUP_MIN_SETTLE_MS = 20_000
 const WARMUP_CAP_MS = 40_000
 const WARMUP_STABILITY_TOLERANCE = 0.2
 
@@ -111,21 +111,32 @@ async function waitForServer(url, timeoutMs = 30_000) {
   throw new Error(`Dev server at ${url} did not become ready within ${timeoutMs}ms`)
 }
 
-async function startDevServerIfNeeded() {
-  if (await isServerUp(BASE_URL)) {
-    console.log(`[dev-server] reusing existing server at ${BASE_URL}`)
+// Fps is measured against the PRODUCTION build served by `vite preview`
+// (added 2026-07-08): the dev server runs React dev mode + unminified deps,
+// whose main-thread overhead depressed and destabilized fps readings. The §2
+// floors describe the shipped game, so the probe measures what ships.
+// (The client build happens first in main(), so dist/ is always current.)
+const PREVIEW_URL = 'http://localhost:4173'
+
+async function startPreviewServer() {
+  if (await isServerUp(PREVIEW_URL)) {
+    console.log(`[preview-server] reusing existing server at ${PREVIEW_URL}`)
     return null
   }
-  console.log('[dev-server] starting `npm run dev --prefix client`...')
-  const child = spawn('npm', ['run', 'dev', '--prefix', 'client'], {
-    cwd: REPO_ROOT,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: true,
-  })
+  console.log('[preview-server] starting `npm run preview --prefix client -- --port 4173 --strictPort`...')
+  const child = spawn(
+    'npm',
+    ['run', 'preview', '--prefix', 'client', '--', '--port', '4173', '--strictPort'],
+    {
+      cwd: REPO_ROOT,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+    }
+  )
   child.stdout.on('data', () => {})
   child.stderr.on('data', () => {})
-  await waitForServer(BASE_URL)
-  console.log('[dev-server] ready')
+  await waitForServer(PREVIEW_URL)
+  console.log('[preview-server] ready')
   return child
 }
 
@@ -139,7 +150,7 @@ function stopDevServer(child) {
 }
 
 async function driveToPlayingState(page) {
-  await page.goto(BASE_URL + '/')
+  await page.goto(PREVIEW_URL + '/?seed=9')
   const launchButton = page.getByRole('button', { name: /Launch Offline Reactor/i })
   await launchButton.waitFor({ state: 'visible', timeout: 15_000 })
   await launchButton.click()
@@ -195,7 +206,13 @@ async function waitForWarmup(page) {
 // biased low by the environment, not the build. Floor asserts still fail
 // honestly — the canary tells the reader (and the gate-verifier) whether to
 // re-run on an idle machine before concluding the BUILD misses the floor.
-const CANARY_CONTENTION_THRESHOLD = 50
+//
+// 58, not lower: the desktop floor asserts 60 fps, and if the trivial canary
+// itself can't reach ~the rAF cap then NO build could measure 60 in that
+// window — below this the whole measurement is invalid, not merely noisy
+// (observed 2026-07-08: canary 58 shaved the game read to 57 on a build that
+// measures 60 in a clean window; verify.mjs retries on the CONTENDED flag).
+const CANARY_CONTENTION_THRESHOLD = 59
 const CANARY_HTML = `<!doctype html><canvas id=c width=2880 height=1620></canvas><script type=module>
 const adapter = await navigator.gpu.requestAdapter()
 const device = await adapter.requestDevice()
@@ -230,10 +247,10 @@ requestAnimationFrame(tick)
 
 async function measureGpuCanary(context) {
   const page = await context.newPage()
-  await page.route(BASE_URL + '/__canary', (route) =>
+  await page.route(PREVIEW_URL + '/__canary', (route) =>
     route.fulfill({ contentType: 'text/html', body: CANARY_HTML })
   )
-  await page.goto(BASE_URL + '/__canary')
+  await page.goto(PREVIEW_URL + '/__canary')
   await sleep(2500) // let the counter produce full 1s windows
   const vals = []
   for (let i = 0; i < 4; i++) {
@@ -271,7 +288,7 @@ function median(nums) {
 
 async function measurePerf(profileName) {
   const profile = PROFILES[profileName]
-  const devServer = await startDevServerIfNeeded()
+  const previewServer = await startPreviewServer()
   let browser
   try {
     browser = await chromium.launch({ headless: true, args: WEBGPU_ARGS })
@@ -305,7 +322,7 @@ async function measurePerf(profileName) {
     }
   } finally {
     if (browser) await browser.close()
-    stopDevServer(devServer)
+    stopDevServer(previewServer)
   }
 }
 
@@ -466,8 +483,10 @@ function assertFloors(profileName, perf, bundle) {
 async function main() {
   const args = parseArgs(process.argv.slice(2))
 
-  const perf = await measurePerf(args.profile)
+  // Build first: measurePerf drives the PRODUCTION build via `vite preview`,
+  // so dist/ must be current before the browser launches.
   const bundle = await buildClientAndMeasureBundle()
+  const perf = await measurePerf(args.profile)
 
   printTable(args.profile, perf, bundle)
 

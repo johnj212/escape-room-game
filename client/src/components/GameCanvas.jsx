@@ -130,7 +130,7 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
 
   return (
     <Canvas
-      shadows={{ type: THREE.PCFSoftShadowMap }}
+      shadows={{ type: THREE.PCFShadowMap }}
       // Desktop dpr clamp 1.5 (§2 allows dpr ≤ 2): with the D-5 internal
       // scene scale this sets the whole post chain's pixel budget — measured
       // 2026-07-08 as the difference between ~28 and ~50 fps at 1440p-class

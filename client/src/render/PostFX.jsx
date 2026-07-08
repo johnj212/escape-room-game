@@ -22,13 +22,14 @@ import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js'
 import { sceneLights } from './lightRegistry'
 
 // Desktop internal render scale (D-5, docs/DEVIATIONS.md): the scene pass
-// renders at 72% of canvas resolution and the post chain outputs at full
-// canvas res, finished by FXAA after tonemapping — the same internal-
-// resolution strategy UE5-class titles use to hold frame rate. Measured
-// 2026-07-08: per-pixel shading breadth (PBR light loop + CSM taps + fog +
-// procedural noise) is the fps ceiling at dpr-2 desktop res, with no single
+// renders at this fraction of canvas resolution and the post chain outputs
+// at full canvas res, finished by FXAA after tonemapping — the same
+// internal-resolution strategy UE5-class titles use to hold frame rate.
+// Measured 2026-07-08: per-pixel shading breadth (PBR light loop + CSM taps
+// + fog + procedural noise) is the fps ceiling at desktop res with no single
 // dominant pass — resolution scale is the one lever that shrinks all of it.
-const DESKTOP_SCENE_SCALE = 0.72
+// 0.55 holds the §2 60-fps floor with margin for background-load noise.
+const DESKTOP_SCENE_SCALE = 0.55
 
 // Post stack (§3.6) on three/webgpu's own PostProcessing + TSL display nodes
 // (the WebGL-only @react-three/postprocessing wrapper was retired at the
@@ -89,8 +90,8 @@ export const PostFX = ({ isMobile = false }) => {
         beauty = aberrated
       } else {
         const aoPass = ao(depth, normal, camera)
-        aoPass.resolutionScale = 0.4
-        aoPass.samples.value = 8
+        aoPass.resolutionScale = 0.35
+        aoPass.samples.value = 6
         beauty = aberrated.mul(aoPass.getTextureNode().r)
       }
 
@@ -99,7 +100,8 @@ export const PostFX = ({ isMobile = false }) => {
       const reactor = sceneLights.reactor
       if (reactor && !fxoff.has('godrays')) {
         const shafts = godrays(depth, camera, reactor)
-        shafts.raymarchSteps.value = 18
+        shafts.resolutionScale = 0.35
+        shafts.raymarchSteps.value = 10
         shafts.density.value = 0.55
         shafts.maxDensity.value = 0.34
         shafts.distanceAttenuation.value = 2.2
