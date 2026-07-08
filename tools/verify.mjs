@@ -5,9 +5,13 @@
 //
 // Runs a phase's check manifest as REAL subprocesses (no stubs, no fabricated results),
 // prints a numbered PASS/FAIL table, writes a machine-readable JSON summary to
-// tools/.last-verify.json, and exits non-zero iff any HARD check failed. Steps 4-5
-// (perf baseline / bundle size) are record-only in Phase 0 and never affect the exit code —
-// they exist to capture numbers, not to gate the phase.
+// tools/.last-verify.json, and exits non-zero iff any HARD check failed.
+//
+// Phase 0: steps 4-5 (perf baseline / bundle size) are record-only and never affect the
+// exit code — they exist to capture numbers, not to gate the phase.
+// Phase 1: steps 4-5 become HARD perf-floor assertions (Project_Requirements.md §2) via
+// `perf-probe.mjs --mode assert` on the desktop and mobile profiles. perf-probe builds the
+// client as part of its run, so those steps get a generous 10-minute timeout each.
 //
 // CLI: node tools/verify.mjs [--phase <N>]   (default --phase 0)
 
@@ -111,52 +115,94 @@ function runCommand(cmd, args, { cwd = REPO_ROOT, timeoutMs = 6 * 60_000 } = {})
 // Phase manifests
 // ---------------------------------------------------------------------------
 
+// Steps 1-3 are identical in every phase's battery (Project_Requirements.md §5): the static
+// gate, the unit suite, and the e2e suite, all HARD. Defined once, id assigned per manifest.
+function staticGateCheck(id) {
+  return {
+    id,
+    name: 'Static gate (eslint, 0 warnings)',
+    hard: true,
+    async run() {
+      const res = await runCommand('npm', ['run', 'lint', '--prefix', 'client'])
+      return {
+        pass: res.code === 0,
+        status: res.code === 0 ? 'PASS' : 'FAIL',
+        durationMs: res.durationMs,
+        note: res.code === 0 ? '0 warnings/errors' : tail(res.stdout + res.stderr),
+      }
+    },
+  }
+}
+
+function unitTestsCheck(id) {
+  return {
+    id,
+    name: 'Unit tests (vitest)',
+    hard: true,
+    async run() {
+      const res = await runCommand('npm', ['test', '--prefix', 'client'])
+      return {
+        pass: res.code === 0,
+        status: res.code === 0 ? 'PASS' : 'FAIL',
+        durationMs: res.durationMs,
+        note: res.code === 0 ? 'all specs passed' : tail(res.stdout + res.stderr),
+      }
+    },
+  }
+}
+
+function e2eCheck(id) {
+  return {
+    id,
+    name: 'E2E (playwright)',
+    hard: true,
+    async run() {
+      const res = await runCommand('npm', ['run', 'e2e', '--prefix', 'client'], {
+        timeoutMs: 10 * 60_000,
+      })
+      return {
+        pass: res.code === 0,
+        status: res.code === 0 ? 'PASS' : 'FAIL',
+        durationMs: res.durationMs,
+        note: res.code === 0 ? 'e2e suite green' : tail(res.stdout + res.stderr),
+      }
+    },
+  }
+}
+
+// Phase 1+: HARD perf-floor assertion for one profile via perf-probe assert mode
+// (§2 floors: desktop fps>=60 / tris>=2M / JS+CSS gzip<=500KB excl. rapier-wasm chunk;
+// mobile fps>=30 / tris>=0.5M — the floors live in perf-probe's FLOORS table).
+// perf-probe builds the client as part of its run, hence the 10-minute timeout.
+function perfFloorsCheck(id, profile) {
+  return {
+    id,
+    name: `Perf floors ${profile} (perf-probe assert)`,
+    hard: true,
+    async run() {
+      const res = await runCommand(
+        'node',
+        ['tools/perf-probe.mjs', '--mode', 'assert', '--profile', profile],
+        { timeoutMs: 10 * 60_000 },
+      )
+      return {
+        pass: res.code === 0,
+        status: res.code === 0 ? 'PASS' : 'FAIL',
+        durationMs: res.durationMs,
+        note:
+          res.code === 0
+            ? `§2 ${profile} floors met`
+            : tail(res.stdout + res.stderr),
+      }
+    },
+  }
+}
+
 function phase0Manifest() {
   return [
-    {
-      id: 1,
-      name: 'Static gate (eslint, 0 warnings)',
-      hard: true,
-      async run() {
-        const res = await runCommand('npm', ['run', 'lint', '--prefix', 'client'])
-        return {
-          pass: res.code === 0,
-          status: res.code === 0 ? 'PASS' : 'FAIL',
-          durationMs: res.durationMs,
-          note: res.code === 0 ? '0 warnings/errors' : tail(res.stdout + res.stderr),
-        }
-      },
-    },
-    {
-      id: 2,
-      name: 'Unit tests (vitest)',
-      hard: true,
-      async run() {
-        const res = await runCommand('npm', ['test', '--prefix', 'client'])
-        return {
-          pass: res.code === 0,
-          status: res.code === 0 ? 'PASS' : 'FAIL',
-          durationMs: res.durationMs,
-          note: res.code === 0 ? 'all specs passed' : tail(res.stdout + res.stderr),
-        }
-      },
-    },
-    {
-      id: 3,
-      name: 'E2E (playwright)',
-      hard: true,
-      async run() {
-        const res = await runCommand('npm', ['run', 'e2e', '--prefix', 'client'], {
-          timeoutMs: 10 * 60_000,
-        })
-        return {
-          pass: res.code === 0,
-          status: res.code === 0 ? 'PASS' : 'FAIL',
-          durationMs: res.durationMs,
-          note: res.code === 0 ? 'e2e suite green' : tail(res.stdout + res.stderr),
-        }
-      },
-    },
+    staticGateCheck(1),
+    unitTestsCheck(2),
+    e2eCheck(3),
     {
       id: 4,
       name: 'Perf baseline (record-only)',
@@ -229,8 +275,21 @@ function phase0Manifest() {
   ]
 }
 
+// Phase 1 battery: same hard 1-3 as Phase 0, then the §2 perf floors become HARD gates —
+// desktop and mobile profiles asserted separately, each against its own floor row.
+function phase1Manifest() {
+  return [
+    staticGateCheck(1),
+    unitTestsCheck(2),
+    e2eCheck(3),
+    perfFloorsCheck(4, 'desktop'),
+    perfFloorsCheck(5, 'mobile'),
+  ]
+}
+
 const MANIFESTS = {
   0: phase0Manifest,
+  1: phase1Manifest,
 }
 
 // ---------------------------------------------------------------------------

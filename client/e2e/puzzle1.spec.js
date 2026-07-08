@@ -54,8 +54,15 @@ test.describe('App boot + solo-swap solve of Puzzle 1 (Decoupled Power Grid)', (
   test('boots without errors, mounts a live render context, and solves P1 via character-swap', async ({ page }) => {
     const consoleErrors = []
     const pageErrors = []
+    const physicsRescues = []
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text())
+      // Regression guard: Room.jsx's collider-only RigidBodies silently
+      // generated ZERO colliders (auto-collider generation traverses only
+      // visible meshes; fixed with includeInvisible, 2026-07-08) — players
+      // free-fell forever and the rescue teleport masked it. The solve flow
+      // must never trip the rescue.
+      if (/fell through floor/i.test(msg.text())) physicsRescues.push(msg.text())
     })
     page.on('pageerror', (err) => pageErrors.push(String(err)))
 
@@ -187,6 +194,7 @@ test.describe('App boot + solo-swap solve of Puzzle 1 (Decoupled Power Grid)', (
       .poll(() => page.evaluate(() => window.useGameStore.getState().gamePhase))
       .toBe('win')
 
+    expect(physicsRescues).toEqual([])
     // 8. Zero console exceptions across the entire flow (Pillar E rule).
     expect(pageErrors).toEqual([])
     expect(consoleErrors).toEqual([])

@@ -19,18 +19,24 @@ import { sceneLights } from './lightRegistry'
 // source — Pillar B/C: light must *come from somewhere*).
 
 const FIXTURES = {
-  // Ceiling light panels: [x, z, tint, intensity(candela)]
+  // Ceiling light panels: [x, z, tint, intensity(candela), hasLight]
+  // All five panels glow (emissive quads); only three carry point lights —
+  // the forward light loop prices every punctual light on every fragment,
+  // and the 2026-07-08 fps-floor bisect measured the panel lights as ~25%
+  // of scene-pass cost. Back corners ride the reactor glow + alarm spot.
   panels: [
-    [-5, -5, '#bcd2ff', 18],
-    [5, -5, '#bcd2ff', 18],
-    [-5, 5, '#bcd2ff', 18],
-    [5, 5, '#bcd2ff', 18],
-    [0, 0, '#d6e4ff', 20],
+    [-5, -5, '#bcd2ff', 20, false],
+    [5, -5, '#bcd2ff', 20, false],
+    [-5, 5, '#bcd2ff', 22, true],
+    [5, 5, '#bcd2ff', 22, true],
+    [0, 0, '#d6e4ff', 24, true],
   ],
-  // Sector bounce fills (shadowless, mimic wall-neon bounce until probes):
+  // Sector bounce fills (shadowless, mimic wall-neon bounce until probes).
+  // Pulled toward the consoles (±7) since the dedicated console task lights
+  // were consolidated away — one light per sector does both jobs now.
   fills: [
-    [-8.5, 3.5, 0, '#00f3ff', 9, 9], // Engineer wall wash
-    [8.5, 3.5, 0, '#ff007f', 9, 9], // Technician wall wash
+    [-7, 3.2, 0, '#00f3ff', 11, 10], // Engineer wall + console wash
+    [7, 3.2, 0, '#ff007f', 11, 10], // Technician wall + console wash
   ],
 }
 
@@ -93,17 +99,19 @@ export const Lighting = ({ isMobile = false }) => {
       {/* Key light: 4-cascade CSM (desktop) / 2-cascade (mobile) */}
       <CSMKeyLight isMobile={isMobile} />
 
-      {/* Ceiling fixtures: emissive panel + its own point light */}
-      {FIXTURES.panels.map(([x, z, tint, intensity], i) => (
+      {/* Ceiling fixtures: emissive panel + (for three of five) a point light */}
+      {FIXTURES.panels.map(([x, z, tint, intensity, hasLight], i) => (
         <group key={`panel-${i}`} position={[x, 7.55, z]}>
           <mesh geometry={panelGeo} material={panelMat} />
-          <pointLight
-            position={[0, -0.35, 0]}
-            color={tint}
-            intensity={intensity}
-            distance={13}
-            decay={2}
-          />
+          {hasLight && (
+            <pointLight
+              position={[0, -0.35, 0]}
+              color={tint}
+              intensity={intensity}
+              distance={13}
+              decay={2}
+            />
+          )}
         </group>
       ))}
 
@@ -128,8 +136,7 @@ export const Lighting = ({ isMobile = false }) => {
         distance={20}
         decay={2}
         color="#ff007f"
-        castShadow={!isMobile}
-        shadow-bias={-0.0002}
+        castShadow={false}
       />
       <pointLight
         // Shadow-casting so GodraysNode can raymarch its shafts (the effect
@@ -149,25 +156,10 @@ export const Lighting = ({ isMobile = false }) => {
         shadow-bias={-0.0015}
       />
 
-      {/* Console task lights (Engineer cyan / Technician magenta). 14 cd:
-          enough to pool role color on the plating without the floor hotspot
-          crossing the bloom threshold (delta round 1, gap #1 blowout). */}
-      <pointLight
-        position={[-5, 2.0, 0]}
-        intensity={14}
-        distance={6}
-        decay={2}
-        color="#00f3ff"
-        castShadow={!isMobile}
-      />
-      <pointLight
-        position={[5, 2.0, 0]}
-        intensity={14}
-        distance={6}
-        decay={2}
-        color="#ff007f"
-        castShadow={!isMobile}
-      />
+      {/* Console task lighting comes from the consoles' own emissive trim +
+          bloom; their dedicated point lights were cut in the 2026-07-08
+          light-count consolidation (fps floor). The sector fills above keep
+          role color pooling on the plating near each console. */}
     </>
   )
 }

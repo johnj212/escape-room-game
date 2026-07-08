@@ -1,7 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { Canvas, useFrame, useThree, addAfterEffect } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
-import { AdaptiveDpr, AdaptiveEvents } from '@react-three/drei'
+// AdaptiveDpr was removed 2026-07-08: with a dpr clamp below the device's
+// ratio it re-asserts its own dpr every frame, and each write resizes the
+// canvas → full WebGPU pipeline rebuild → 1 fps. The Phase-4 quality ladder
+// will drive dpr through fiber's performance API instead.
+import { AdaptiveEvents } from '@react-three/drei'
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import { useGameStore } from '../store/gameStore'
@@ -127,7 +131,11 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
   return (
     <Canvas
       shadows={{ type: THREE.PCFSoftShadowMap }}
-      dpr={isMobile ? [1, 1.2] : [1, 2]}
+      // Desktop dpr clamp 1.5 (§2 allows dpr ≤ 2): with the D-5 internal
+      // scene scale this sets the whole post chain's pixel budget — measured
+      // 2026-07-08 as the difference between ~28 and ~50 fps at 1440p-class
+      // output. Retina text/HUD stays DOM-rendered at native dpr.
+      dpr={isMobile ? [1, 1.2] : [1, 1.5]}
       // WebGPU-only render path (Pillar E / §1): fiber v9 awaits this async
       // factory; the factory must await renderer.init() itself (adapter +
       // device acquisition) — verified against installed fiber source,
@@ -136,7 +144,11 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
       gl={async (props) => {
         const renderer = new WebGPURenderer({
           ...props,
-          antialias: !isMobile,
+          // MSAA off: 4x samples on the PostFX scene pass (MRT color+normal)
+          // at dpr-2 desktop res was the single biggest fill-rate cost —
+          // measured 2026-07-07 during the fps-floor turn. Post-stack CA +
+          // bloom already soften edges; FXAA is the seam if aliasing shows.
+          antialias: false,
         })
         await renderer.init()
         renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -185,8 +197,6 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
           three/webgpu PostProcessing + TSL display nodes, profile-gated. */}
       <PostFX isMobile={isMobile} />
 
-      {/* Low-spec helpers to adapt performance */}
-      <AdaptiveDpr pixelated />
       <AdaptiveEvents />
     </Canvas>
   )

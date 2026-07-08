@@ -30,7 +30,7 @@ export const Room = () => {
       <Deck />
 
       {/* 1. Floor collider (visuals: Deck floor plates) */}
-      <RigidBody type="fixed" colliders="cuboid">
+      <RigidBody type="fixed" colliders="cuboid" includeInvisible>
         <mesh visible={false} position={[0, -0.1, 0]}>
           <boxGeometry args={[20, 0.2, 20]} />
         </mesh>
@@ -40,22 +40,22 @@ export const Room = () => {
           (z=+10, behind the camera) has always been physics-only so the
           third-person camera can see into the room — that now holds for all
           four: visible={false}, collision-only. */}
-      <RigidBody type="fixed" colliders="cuboid">
+      <RigidBody type="fixed" colliders="cuboid" includeInvisible>
         <mesh visible={false} position={[0, 4, -10]}>
           <boxGeometry args={[20, 8, 0.5]} />
         </mesh>
       </RigidBody>
-      <RigidBody type="fixed" colliders="cuboid">
+      <RigidBody type="fixed" colliders="cuboid" includeInvisible>
         <mesh visible={false} position={[-10, 4, 0]} rotation={[0, Math.PI / 2, 0]}>
           <boxGeometry args={[20, 8, 0.5]} />
         </mesh>
       </RigidBody>
-      <RigidBody type="fixed" colliders="cuboid">
+      <RigidBody type="fixed" colliders="cuboid" includeInvisible>
         <mesh visible={false} position={[10, 4, 0]} rotation={[0, -Math.PI / 2, 0]}>
           <boxGeometry args={[20, 8, 0.5]} />
         </mesh>
       </RigidBody>
-      <RigidBody type="fixed" colliders="cuboid" position={[0, 4, 10]} rotation={[0, Math.PI, 0]}>
+      <RigidBody type="fixed" colliders="cuboid" includeInvisible position={[0, 4, 10]} rotation={[0, Math.PI, 0]}>
         <mesh visible={false}>
           <boxGeometry args={[20, 8, 0.5]} />
         </mesh>
@@ -63,7 +63,7 @@ export const Room = () => {
 
       {/* 3. Security partition: splits Engineer (left) / Technician (right)
           sectors — the physical enforcement of P1's information/action split. */}
-      <RigidBody type="fixed" colliders="cuboid">
+      <RigidBody type="fixed" colliders="cuboid" includeInvisible>
         <mesh position={[0, 2, 0]} material={glassMat}>
           <boxGeometry args={[0.2, 4, 16]} />
         </mesh>
@@ -76,7 +76,7 @@ export const Room = () => {
       </RigidBody>
 
       {/* 4. Reactor collider (visuals: Deck reactor assembly at z=-9) */}
-      <RigidBody type="fixed" colliders="cuboid">
+      <RigidBody type="fixed" colliders="cuboid" includeInvisible>
         <mesh visible={false} position={[0, 4, -9]}>
           <cylinderGeometry args={[1.8, 1.8, 8, 12]} />
         </mesh>

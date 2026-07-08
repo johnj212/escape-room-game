@@ -1,9 +1,9 @@
 {
-  "phase": 0,
-  "timestamp": "2026-07-07T21:01:59.746Z",
-  "overallPass": true,
-  "hardTotal": 3,
-  "hardPassed": 3,
+  "phase": 1,
+  "timestamp": "2026-07-08T05:46:05.321Z",
+  "overallPass": false,
+  "hardTotal": 5,
+  "hardPassed": 4,
   "checks": [
     {
       "id": 1,
@@ -11,7 +11,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 3479,
+      "durationMs": 2031,
       "note": "0 warnings/errors"
     },
     {
@@ -20,7 +20,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 2167,
+      "durationMs": 2108,
       "note": "all specs passed"
     },
     {
@@ -29,26 +29,26 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 16576,
+      "durationMs": 13065,
       "note": "e2e suite green"
     },
     {
       "id": 4,
-      "name": "Perf baseline (record-only)",
-      "hard": false,
-      "pass": true,
-      "status": "RECORD",
-      "durationMs": 18316,
-      "note": "[dev-server] reusing existing server at http://localhost:5173\n[perf-probe] sampling __PERF__ for 3000ms (desktop)...\n[perf-probe] building client (`npm run build --prefix client`)...\n\nperf-probe results (WebGPU build, Phase 1)\n---------------------------------------------\nprofile                   : desktop\nfps (median)              : 2\ndrawCalls (median)        : 504\ntriangles (median)        : 1337959\nsamples                   : 6\nJS+CSS gzip (excl. .wasm) : 483.2 KB\nJS+CSS files measured     : 2\n.wasm files excluded      : 1\n---------------------------------------------\n[perf-probe] STATUS.md updated (overwrote existing block): /Users/johnmather/coding/Anti/escape room game/STATUS.md\n"
+      "name": "Perf floors desktop (perf-probe assert)",
+      "hard": true,
+      "pass": false,
+      "status": "FAIL",
+      "durationMs": 40066,
+      "note": "[dev-server] reusing existing server at http://localhost:5173\n[perf-probe] GPU canary: 39.5 fps (raw fullscreen ALU @2880x1620) — BELOW 50: environment is GPU-contended, game numbers biased low\n[perf-probe] warmup: waiting for fps to stabilize (min 12s, cap 40s, ±20% between consecutive 1s polls)...\n[perf-probe] warmup: stabilized after 12.4s (fps 32 → 32)\n[perf-probe] sampling __PERF__ for 8000ms (desktop)...\n[perf-probe] building client (`npm run build --prefix client`)...\n\nperf-probe results (WebGPU build, Phase 1)\n---------------------------------------------\nprofile                   : desktop\nfps (median)              : 37\ndrawCalls (median)        : 408\ntriangles (median)        : 2021744\nsamples                   : 56\nGPU canary                : 39.5 fps — CONTENDED environment (game fps biased low; re-run idle)\nwarmup settle             : 12.4s\nwarmup stabilized         : yes\nJS+CSS gzip (excl. .wasm) : 484.3 KB\nJS+CSS files measured     : 2\n.wasm files excluded      : 1\n---------------------------------------------\n[perf-probe] ASSERT FAILED (desktop):\n  - fps 37 < floor 60\n[perf-probe] NOTE: GPU canary 39.5 < 50 — the environment is GPU-contended; re-run on an idle machine before concluding the BUILD misses the floor.\n"
     },
     {
       "id": 5,
-      "name": "Bundle size (record-only, surfaced via step 4)",
-      "hard": false,
+      "name": "Perf floors mobile (perf-probe assert)",
+      "hard": true,
       "pass": true,
-      "status": "RECORD",
-      "durationMs": null,
-      "note": "surfaced by step 4 — see that row / STATUS.md for the bundle-size numbers"
+      "status": "PASS",
+      "durationMs": 40893,
+      "note": "§2 mobile floors met"
     }
   ]
 }

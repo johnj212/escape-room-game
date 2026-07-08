@@ -87,10 +87,13 @@ export const Player = ({ id, playerInfo, inputRef, emitMovement }) => {
         const targetRotation = Math.atan2(moveX, moveZ)
         // Smoothly rotate mesh
         if (meshRef.current) {
+          // Clamp ≤1: WebGPU pipeline-compile hitches spike delta past 0.1s
+          // and an unclamped 10*delta lerp diverges (same gotcha as
+          // CameraFollow — see GameCanvas.jsx).
           meshRef.current.rotation.y = THREE.MathUtils.lerp(
             meshRef.current.rotation.y,
             targetRotation,
-            10 * delta
+            Math.min(1, 10 * delta)
           )
         }
       }
@@ -122,10 +125,14 @@ export const Player = ({ id, playerInfo, inputRef, emitMovement }) => {
       const targetRot = playerInfo.rotation
       
       if (targetPos && rbRef.current) {
+        // Clamp ≤1 (kinematic position lerp): unclamped 10*delta on a hitch
+        // frame overshoots exponentially and can drive avatars below the
+        // floor — 2026-07-08 physics investigation.
+        const k = Math.min(1, 10 * delta)
         const currentPos = rbRef.current.translation()
-        const nextX = THREE.MathUtils.lerp(currentPos.x, targetPos[0], 10 * delta)
-        const nextY = THREE.MathUtils.lerp(currentPos.y, targetPos[1], 10 * delta)
-        const nextZ = THREE.MathUtils.lerp(currentPos.z, targetPos[2], 10 * delta)
+        const nextX = THREE.MathUtils.lerp(currentPos.x, targetPos[0], k)
+        const nextY = THREE.MathUtils.lerp(currentPos.y, targetPos[1], k)
+        const nextZ = THREE.MathUtils.lerp(currentPos.z, targetPos[2], k)
         
         rbRef.current.setTranslation({ x: nextX, y: nextY, z: nextZ }, true)
         
@@ -137,7 +144,7 @@ export const Player = ({ id, playerInfo, inputRef, emitMovement }) => {
         meshRef.current.rotation.y = THREE.MathUtils.lerp(
           meshRef.current.rotation.y,
           targetRot,
-          10 * delta
+          Math.min(1, 10 * delta)
         )
       }
     }

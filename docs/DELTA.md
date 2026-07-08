@@ -44,6 +44,8 @@ Re-render: `docs/shots/phase1-hero.png` (intermediates `phase1-hero-r2/r3.png`) 
 - **#3 closed.** Wall metalness 0.75→0.55 (pure metal + no environment probe (D-4) = black; painted-alloy keeps a diffuse lobe), hemisphere 3.2→4.2, ambient 0.55→0.7. Darkest corners now carry warm reactor / cool sky color with readable panel detail.
 Remains (re-ranked for the next round): #5 reactor is a plain ball behind struts (biggest remaining), #4 ambient haze/motes, #6 floor grime/wear variation, #9 droid detail.
 
+_2026-07-08 addendum:_ hero re-rendered after the fps-floor turn (D-5: dpr 1.5 + 0.72 scene scale + FXAA, light consolidation, transmission-off glass) and the 2M density turn — composition, cipher legibility and wall color all hold; the reactor containment cage actually reads better without transmission. Frame is marginally dimmer overall (two ceiling panels lost their point lights); acceptable against Pillar C — darkest corners still carry color.
+
 ---
 
 ## 2026-07-07 — Phase 0 — Scaffold hero shot vs. reference (gate-verifier round) + reference correction

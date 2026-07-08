@@ -31,6 +31,12 @@ import {
   mx_cell_noise_float,
 } from 'three/tsl'
 
+// Noise budget note (2026-07-08 fps-floor bisect): the material library's
+// per-pixel noise measured ~20% of scene-pass cost at dpr-2 desktop res.
+// Fractal noise below runs at 2 octaves (default is 3) — visually
+// indistinguishable at gameplay camera distance, half the ALU.
+const FRACTAL_OCTAVES = 2
+
 // -- shared procedural ingredients -------------------------------------------
 
 /** Anisotropic "brushed" streak field: noise stretched hard along one axis. */
@@ -59,7 +65,7 @@ export function deckPlateMaterial({ plateSize = 2 } = {}) {
 
   // Long directional scratches + fine wear noise.
   const scratches = brushedStreaks(1, positionWorld.x, positionWorld.z, 0.9, 14.0)
-  const wear = mx_fractal_noise_float(positionWorld.xz.mul(3.0))
+  const wear = mx_fractal_noise_float(positionWorld.xz.mul(3.0), FRACTAL_OCTAVES)
 
   // Seam darkening: grime collects at plate edges.
   const edgeX = smoothstep(0.0, 0.06, local.x).mul(smoothstep(1.0, 0.94, local.x))
@@ -91,7 +97,7 @@ export function wallPanelMaterial({ panelWidth = 2 } = {}) {
 
   const base = mix(color('#1b212d'), color('#262f40'), tint)
   const brushing = brushedStreaks(1, positionWorld.y, add(positionWorld.x, positionWorld.z), 0.6, 18.0)
-  const blotch = mx_fractal_noise_float(positionWorld.xz.add(positionWorld.yy).mul(0.8))
+  const blotch = mx_fractal_noise_float(positionWorld.xz.add(positionWorld.yy).mul(0.8), FRACTAL_OCTAVES)
 
   mat.colorNode = base
     .add(vec3(brushing.mul(0.015)))
@@ -157,12 +163,16 @@ export function reactorCoreMaterial({ intensity = 5.0 } = {}) {
 
 // -- glass ----------------------------------------------------------------------
 
-/** Containment / partition glass with a cool tint. */
+/** Containment / partition glass with a cool tint.
+ *  Transmission stays 0 (plain alpha transparency): transmission > 0 makes
+ *  the renderer regenerate a full-res transmission target + mip chain every
+ *  frame — measured ~20% of scene-pass cost at dpr-2 (2026-07-08 fps bisect)
+ *  for a refraction read nobody sees on thin flat panes. */
 export function containmentGlassMaterial({ tint = '#8fd8ff', opacity = 0.16 } = {}) {
   const mat = new MeshPhysicalNodeMaterial()
   mat.transparent = true
   mat.opacity = opacity
-  mat.transmission = 0.9
+  mat.transmission = 0
   mat.thickness = 0.6
   mat.roughness = 0.08
   mat.metalness = 0.05

@@ -22,10 +22,10 @@ import {
 
 const ROOM = { half: 10, height: 8 }
 const DENSITY = {
-  plateDiv: 20, // floor plates per side (plateDiv² plates)
+  plateDiv: 26, // floor plates per side (plateDiv² plates)
   rivetsPerPlate: 8, // corners + edge midpoints
-  greebles: 6000, // wall greeble boxes
-  cables: 100, // hanging ceiling cables
+  greebles: 14000, // wall greeble boxes
+  cables: 200, // hanging ceiling cables
   ribEvery: 2, // wall rib spacing (m)
 }
 
@@ -259,7 +259,7 @@ export const Deck = () => {
     plate.translate(0, 0.11, 0)
     return {
       plate,
-      rivet: new THREE.CylinderGeometry(0.028, 0.034, 0.026, 20),
+      rivet: new THREE.CylinderGeometry(0.028, 0.034, 0.026, 28),
       panel: new THREE.BoxGeometry(DENSITY.ribEvery - 0.18, 3.6, 0.1),
       rib: new THREE.BoxGeometry(0.16, ROOM.height - 0.5, 0.22),
       rail: new THREE.BoxGeometry(ROOM.half * 2 - 0.2, 0.14, 0.1),
@@ -271,8 +271,8 @@ export const Deck = () => {
       conduit: new THREE.CylinderGeometry(0.03, 0.03, ROOM.half * 2, 16),
       reactorBase: new THREE.CylinderGeometry(2.3, 2.55, 0.6, 96),
       reactorGlass: new THREE.CylinderGeometry(1.5, 1.5, 6.2, 96, 1, true),
-      reactorCore: new THREE.IcosahedronGeometry(0.95, 6),
-      reactorRing: new THREE.TorusGeometry(1.68, 0.07, 28, 300),
+      reactorCore: new THREE.IcosahedronGeometry(0.95, 7),
+      reactorRing: new THREE.TorusGeometry(1.68, 0.07, 36, 420),
       reactorStrut: new THREE.BoxGeometry(0.14, 6.4, 0.2),
       reactorDuct: new THREE.CylinderGeometry(0.75, 1.0, 1.6, 32),
     }

@@ -6,6 +6,7 @@ import {
   mrt,
   output,
   normalView,
+  renderOutput,
   screenUV,
   float,
   vec2,
@@ -17,7 +18,17 @@ import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js'
 import { ao } from 'three/examples/jsm/tsl/display/GTAONode.js'
 import { chromaticAberration } from 'three/examples/jsm/tsl/display/ChromaticAberrationNode.js'
 import { godrays } from 'three/examples/jsm/tsl/display/GodraysNode.js'
+import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js'
 import { sceneLights } from './lightRegistry'
+
+// Desktop internal render scale (D-5, docs/DEVIATIONS.md): the scene pass
+// renders at 72% of canvas resolution and the post chain outputs at full
+// canvas res, finished by FXAA after tonemapping — the same internal-
+// resolution strategy UE5-class titles use to hold frame rate. Measured
+// 2026-07-08: per-pixel shading breadth (PBR light loop + CSM taps + fog +
+// procedural noise) is the fps ceiling at dpr-2 desktop res, with no single
+// dominant pass — resolution scale is the one lever that shrinks all of it.
+const DESKTOP_SCENE_SCALE = 0.72
 
 // Post stack (§3.6) on three/webgpu's own PostProcessing + TSL display nodes
 // (the WebGL-only @react-three/postprocessing wrapper was retired at the
@@ -46,6 +57,14 @@ export const PostFX = ({ isMobile = false }) => {
   const [post, setPost] = useState(null)
 
   useEffect(() => {
+    // Perf-ablation switch for the fps harness (`?fxoff=godrays,ao,ca,bloom`):
+    // lets tools bisect per-pass GPU cost on the live stack. Not a quality
+    // ladder — the shipped profiles are exactly (desktop, mobile).
+    const fxoff = new Set(
+      (new URLSearchParams(window.location.search).get('fxoff') ?? '')
+        .split(',')
+        .filter(Boolean)
+    )
     const processing = new PostProcessing(gl)
 
     const scenePass = pass(scene, camera)
@@ -54,6 +73,7 @@ export const PostFX = ({ isMobile = false }) => {
     if (isMobile) {
       beauty = scenePass.getTextureNode('output')
     } else {
+      scenePass.setResolutionScale(DESKTOP_SCENE_SCALE)
       scenePass.setMRT(mrt({ output, normal: normalView }))
       const colorTex = scenePass.getTextureNode('output')
       const normal = scenePass.getTextureNode('normal')
@@ -61,19 +81,25 @@ export const PostFX = ({ isMobile = false }) => {
 
       // 0.35: fringing should whisper at frame edges, not rainbow-split the
       // ceiling neon (delta round 1 re-render check).
-      const aberrated = chromaticAberration(colorTex, 0.35, vec2(0.5, 0.5), 1.04)
+      const aberrated = fxoff.has('ca')
+        ? colorTex
+        : chromaticAberration(colorTex, 0.35, vec2(0.5, 0.5), 1.04)
 
-      const aoPass = ao(depth, normal, camera)
-      aoPass.resolutionScale = 0.5
-      aoPass.samples.value = 8
-      beauty = aberrated.mul(aoPass.getTextureNode().r)
+      if (fxoff.has('ao')) {
+        beauty = aberrated
+      } else {
+        const aoPass = ao(depth, normal, camera)
+        aoPass.resolutionScale = 0.4
+        aoPass.samples.value = 8
+        beauty = aberrated.mul(aoPass.getTextureNode().r)
+      }
 
       // Volumetric shafts (§2): raymarched from the reactor's shadow-casting
       // glow light, composited additively in the reactor's own hue.
       const reactor = sceneLights.reactor
-      if (reactor) {
+      if (reactor && !fxoff.has('godrays')) {
         const shafts = godrays(depth, camera, reactor)
-        shafts.raymarchSteps.value = 28
+        shafts.raymarchSteps.value = 18
         shafts.density.value = 0.55
         shafts.maxDensity.value = 0.34
         shafts.distanceAttenuation.value = 2.2
@@ -85,14 +111,26 @@ export const PostFX = ({ isMobile = false }) => {
     // lit metal and light-pool hotspots on the floor stay crisp. Radius 0.6
     // keeps halos hugging their sources (delta round 1, gap #1: the old
     // 0.72/0.85 smeared the hologram console into a frame-eating blob).
-    const bloomPass = bloom(beauty, isMobile ? 0.5 : 0.6, 0.6, 1.0)
-    let composed = beauty.add(bloomPass)
+    let composed = beauty
+    if (!fxoff.has('bloom')) {
+      const bloomPass = bloom(beauty, isMobile ? 0.5 : 0.6, 0.6, 1.0)
+      composed = beauty.add(bloomPass)
+    }
 
     const radial = screenUV.sub(0.5).mul(2.0).length()
     const vignette = smoothstep(1.65, 0.55, radial).mul(0.35).add(0.65)
     composed = composed.mul(vec3(float(vignette)))
 
-    processing.outputNode = composed
+    if (isMobile) {
+      processing.outputNode = composed
+    } else {
+      // FXAA needs sRGB input, so tonemap/color-space (renderOutput) moves
+      // in front of it and the default output transform is disabled. FXAA
+      // also cleans the edge shimmer from the scaled scene pass (MSAA is off
+      // — see GameCanvas.jsx).
+      processing.outputColorTransform = false
+      processing.outputNode = fxaa(renderOutput(composed))
+    }
     setPost(processing)
     return () => {
       setPost(null)
