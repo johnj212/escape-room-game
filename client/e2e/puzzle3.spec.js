@@ -39,17 +39,20 @@ const SEED_ONE_SECTOR = 351
 // test harness routing a character around furniture — it never touches the
 // puzzle's rules.
 const IN_RANGE = 2.2 // comfortably inside STATION_RANGE (3 m), with drift margin
-// Long strides while crossing open floor, short ones for the final approach:
-// a 10 m diagonal in 320 ms hops spends most of its time in CDP round-trips.
-const STEP_FAR_MS = 700
-const STEP_NEAR_MS = 300
-const FAR = 4
+// The movement key stays HELD and only changes when the chosen direction does.
+// Press/release stepping let the hover droid decelerate between every step and
+// spent the walk in CDP round-trips — fine on an idle box, timing out inside a
+// full suite on a loaded one.
+const POLL_MS = 140
 const PROBE = 0.8 // how far ahead a step is checked for clearance
 const CAPSULE = 0.35 // player capsule radius + a little slack
 const PROP_RADIUS = 0.4 // consoles, pedestals, mirror mounts
 const PLAYER_RADIUS = 0.35 // an idle teammate is a solid capsule
 const REACTOR = { pos: [0, -9], r: 1.9 }
-const WALL = 9.4 // inner wall is at 9.75; stay off it
+// The inner wall is at 9.75 and a capsule can rest at ~9.45. Keep this bound
+// OUTSIDE what the character can actually reach: if it sits beyond the bound,
+// every probe scores as 'into the wall' and the walker deadlocks in a corner.
+const WALL = 9.6
 const PARTITION_END = 6.7 // the pane spans z ∈ [-6, 6] on x = 0 (Room.jsx)
 const PARTITION_CLEAR = 0.5 // pane is 0.2 thick; clear it by a capsule
 
@@ -126,11 +129,20 @@ async function greedyWalk(page, playerId, goal, tolerance) {
   const active = await page.evaluate(() => window.useGameStore.getState().activePlayerId)
   expect(active, 'walking a character that is not the active one').toBe(playerId)
   const obs = await obstacles(page, playerId)
-  const deadline = Date.now() + 220_000
+  const deadline = Date.now() + 120_000
   let lastDist = Infinity
   let stalls = 0
+  let held = null
 
-  for (;;) {
+  const hold = async (key) => {
+    if (held === key) return
+    if (held) await page.keyboard.up(held)
+    held = key
+    if (key) await page.keyboard.down(key)
+  }
+
+  try {
+    for (;;) {
     const pos = await readXZ(page, playerId)
     const dist = Math.hypot(pos[0] - goal[0], pos[1] - goal[1])
     if (dist < tolerance) return
@@ -162,33 +174,30 @@ async function greedyWalk(page, playerId, goal, tolerance) {
       const score = Math.hypot(probe[0] - goal[0], probe[1] - goal[1])
       // Once we stop improving, favour a lateral move: perpendicular motion is
       // what slides a capsule off the face of a prop it is pressed against.
-      const lateral = stalls > 3 && Math.abs(score - dist) < 0.35 ? -0.4 : 0
+      const lateral = stalls > 6 && Math.abs(score - dist) < 0.35 ? -0.4 : 0
       if (!best || score + lateral < best.score) best = { key, score: score + lateral }
     }
 
     if (!best) {
-      // Fully enclosed: back away from the nearest obstacle.
-      const near = obs.reduce((a, b) =>
-        Math.hypot(pos[0] - a.pos[0], pos[1] - a.pos[1]) <
-        Math.hypot(pos[0] - b.pos[0], pos[1] - b.pos[1])
-          ? a
-          : b
-      )
-      const [nx, nz] = near.pos
+      // Wedged with every probe rejected. Back toward the middle of the room:
+      // it is always legal ground, and it unsticks both a corner and a prop
+      // face. Prefer the axis we are furthest out on.
       const key =
-        Math.abs(pos[0] - nx) > Math.abs(pos[1] - nz)
-          ? pos[0] > nx
-            ? 'KeyD'
-            : 'KeyA'
-          : pos[1] > nz
-            ? 'KeyS'
-            : 'KeyW'
+        Math.abs(pos[1]) > Math.abs(pos[0])
+          ? pos[1] > 0
+            ? 'KeyW'
+            : 'KeyS'
+          : pos[0] > 0
+            ? 'KeyA'
+            : 'KeyD'
       best = { key }
     }
 
-    await page.keyboard.down(best.key)
-    await page.waitForTimeout(dist > FAR ? STEP_FAR_MS : STEP_NEAR_MS)
-    await page.keyboard.up(best.key)
+    await hold(best.key)
+    await page.waitForTimeout(POLL_MS)
+    }
+  } finally {
+    await hold(null) // never leave a movement key stuck down
   }
 }
 

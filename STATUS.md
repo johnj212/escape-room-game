@@ -113,14 +113,48 @@ All verified with tool evidence this session unless marked pending:
 - **GATE CLOSED (2026-07-09): gate-verifier verdict PASS on re-dispatch** — see the Phase checklist entry. Verifier's non-blocking flags, all handled or carried: stale "1.5 s" comments in `puzzle2.spec.js`/`handoff.md` fixed at gate close; Pillar-C residual carried under D-4 (Phase 5, acceptance test = `tools/pixel-check.mjs`); DELTA #5/#6 (wall machinery density, console greebling) are the next-cheapest visual wins for a future round.
 - **Next: Phase 3 (xhigh)** — Puzzle 3 (laser) + full escape; server-raycast validated; win/lose sequences; reference-delta. All 3 roles required (2026-07-04 amendment); carry the EnvironmentProbe D-4 debugging round when the fps budget allows. **Fresh session starts here per the user's phase protocol.**
 
-## Phase 3 progress (2026-07-09 session — HALTED: monthly spend limit)
+## Phase 3 progress (2026-07-09 — FEATURE-COMPLETE, gate NOT closed)
 
-**Session ended on an external blocker, not a failure.** Both Sonnet subagents
-(server track + client track) were killed mid-task by "You've hit your monthly
-spend limit". All work that was verifiable was verified and committed; nothing
-is claimed here that a tool result this session did not show.
+**Everything below is verified by a tool result this session.** Not run at all:
+`npm run verify`, perf-probe, hero capture — all GPU-serial, and the user
+reported a busy machine. **No fps or triangle claim is made for Phase 3.**
 
-**DONE + verified (three commits on `main`, tree clean):**
+Verified: `vitest 102/102`, `lint 0 warnings`, client build clean,
+`node tools/authority-probe.mjs → 14/14 PASS (exit 0)`,
+**full Playwright suite `8/8 passed` (2.5 min, serial)** — including the solo-swap
+1→2→3 escape and the misfire lockout.
+**Bundle, measured the way the gate measures it** (JS+CSS gzip, excl. the
+Rapier WASM chunk): **495.0 KB = 506,928 B against the 512,000 B floor —
+passing with only ~5 KB of headroom.** (A subagent reported "504 KB" from
+vite's 1000-based main-chunk number; that is not the floor's metric.)
+
+### Three real bugs the tests found (none of which a green unit suite could see)
+
+1. **Emitter arc end-stop.** With the arc centred on +x, 11/200 seeds put the
+   winning heading exactly on an arc stop, where the Engineer's dial cannot
+   turn further. Arc recentred on +34° with a 2-step end margin. *The whole
+   suite passed symbolically the entire time — the D-6 failure class.*
+2. **Two mirrors inside one interaction radius.** The generator kept mounts
+   2.5 m apart while `STATION_RANGE` is 3 m, and `LaserArray.resolveTarget`
+   takes the FIRST station in range — so standing at one mirror rotated the
+   other, and the player could never turn it (seed 132). Separation is now
+   `STATION_RANGE + 0.4`; regression test added.
+3. **The deck's only doorway was ~0.3 m wide.** The partition spanned
+   z ∈ [-8, 8] and the overseer's pedestal sits at [0, 8.5] — squarely in the
+   gap between its end and the back wall. P1/P2 never require a crossing, so
+   nothing caught it; P3 seeds mirrors on BOTH sides and the Technician must
+   get through. Pane shortened to 12 m (z ∈ [-6, 6]). Role separation is
+   unaffected (enforced by the role gates; consoles sit at z=0).
+   *A fourth, fixed earlier: a mirror could spawn on a player spawn point and
+   wedge that character for the entire round.*
+
+Also fixed by reading the input path (no test would have caught it): pressing
+`E` at the receiver called `applyDir` first, which armed the 90 ms input
+throttle with nothing to steer, throttling out the `applyOpen` that follows in
+the same keypress — **the Overseer's aperture could never be opened from the
+keyboard, making P3 unsolvable.**
+
+### Committed (six commits on `main`, tree clean)
 
 - `d95e5a0` — **`shared/laserPuzzle.js`**: the P3 single source of truth (pure,
   clock-injected, dependency-free; server `require()`s it, solo client imports
@@ -169,51 +203,72 @@ is claimed here that a tool result this session did not show.
     `[0,6.5]` vs `[0,8.5]`). It now imports them from `shared/`. Exactly the
     drift D-6 exists to prevent.
 
-- `41e4cac` — **client: laser role gates (verified) + `LaserArray.jsx` (WIP,
-  UNWIRED).** `game/roleGates.js` gains `laserStationAccess` (exactly one role
-  per station, no solo parameter) with exhaustive role × station × range unit
-  tests. `components/LaserArray.jsx` (594 lines: procedural emitter/mirror/
-  receiver props + the beam rendered from the shared `traceLaser` polyline) is
-  **committed but NOT wired** — audited clean (clamped lerp factor, no
-  ContactShadows/AdaptiveDpr, no external assets, no new shadow-casting light),
-  but it reads store actions that **do not exist yet**, so it would throw if
-  mounted. Nothing imports it, so lint and build stay green.
+- `41e4cac` + `e47d937` — **client: role gates, props, store, net, HUD, scene.**
+  `game/roleGates.js` gains `laserStationAccess` (exactly one role per station,
+  no solo parameter) with exhaustive role × station × range tests.
+  `components/LaserArray.jsx` — procedural emitter / 3 mirror mounts / receiver
+  iris, and the beam rendered directly from the shared `traceLaser` polyline
+  (one source of truth; no separate client simulation). `gameStore` gains `p3`
+  (seeded via `?seed=N`), the three role actions, and the `tickLaserPuzzle`
+  solo pump. Online, all three actions emit through `netEmitters` and never
+  touch the local machine. `useMultiplayer` registers the emitters + the
+  `laser-result` ack. HUD flips to a per-ROLE stage-3 objective, and mobile gets
+  a ◀ / ▶ pair (Pillar E: Q/E had no touch equivalent).
+  - Bug the store tests caught: the solo P1 solve rebuilt `puzzleState` as an
+    object literal `{stage, p1, p2}`, silently **dropping `p3`** — every solo
+    run threw at stage 3.
 
-**Verified this session:** `vitest 78/78`, `lint 0 warnings`,
-`node tools/authority-probe.mjs → 14/14 PASS (exit 0)`.
-**NOT run this session** (GPU-serial, and the user reported a busy machine):
-e2e, `npm run verify`, perf probe, hero capture. No fps/triangle claim is made.
+- `2ca0566` + `f18abf0` — **e2e + the room fixes + win/lose sequences.**
+  `client/e2e/puzzle3.spec.js` (2/2): the brief's §5.2 acceptance run — the
+  Engineer steers, the Technician rotates and **holds back the final step**
+  (finishing against a sealed aperture is a sensor overload by design), the
+  Overseer opens the 10 s latch, the player swaps back and lands it → `win`.
+  The spec asserts that after two roles have acted it is STILL unsolved, and
+  that `p3` never contains a `solution` key. Second test: aligned beam on a
+  sealed aperture → lockout → input rejected → recovery with the alignment
+  preserved. `puzzle2.spec.js` updated (a P2 solve now yields stage 3, not a
+  win).
+  - `EndgameSequence.jsx`: diegetic blast-door / escape-pod on win, reactor
+    meltdown wash on lose, plus timer-driven alarm escalation that mutates the
+    **existing** reactor/alarm/sector lights — no new light, no new shadow
+    caster, no new pass. Both respect `prefers-reduced-motion` and cap the
+    pulse rate (photosensitivity).
+  - e2e harness note: the axis-by-axis walker in puzzle1/2 cannot navigate a
+    room with three seeded colliders. puzzle3 uses a greedy stepper with
+    obstacle + partition awareness. Two harness bugs worth remembering: it drove
+    the WRONG character whenever a swap keypress silently failed (swaps are now
+    verified against `activePlayerId`), and **an idle teammate is a solid
+    capsule** that will block the doorway (teammates are now obstacles).
 
-### Next session starts here (Phase 3, resumed)
+### Next session starts here (Phase 3 gate)
 
-1. **Finish the client track** (the only thing blocking e2e):
-   `store/gameStore.js` — add `p3` + `steerEmitter` / `rotateMirror` /
-   `openAperture` (online: emit through `netEmitters`, never solve locally;
-   solo: drive the shared machine) + a `tickLaserPuzzle` solo pump (the solve
-   and the misfire are clock-driven). `hooks/useMultiplayer.js` — register the
-   three emitters + the `laser-result` ack. HUD — stage-3 per-role objective.
-   Then mount `<LaserArray />` in the scene. The component already expects
-   exactly these action names.
-2. **Win/lose sequences** (§3.17): escape-pod launch + meltdown, alarm
-   escalation (Pillar F).
-3. **e2e**: `puzzle3.spec.js` — solo-swap full 1→2→3 escape to the win screen +
-   the lockout path; update `puzzle2.spec.js` (a P2 solve now yields **stage 3**,
-   not a win).
-4. **Reference-delta round 3** + **`node tools/verify.mjs --phase 3`** — both
-   GPU-serial, **idle machine only** (a contended window has produced invalid
-   fps twice; never spend D-5 knobs on those numbers). DELTA #5/#6 (wall
-   machinery density, console greebling) are the next-cheapest visual wins.
-5. **gate-verifier dispatch** → fix findings → re-dispatch → close the gate →
-   STOP for handoff.
+Phase 3 is feature-complete. What remains is all GPU-serial and needs an
+**idle machine** (a contended window has produced invalid fps twice; never
+spend D-5 knobs on numbers from one):
 
-**Blocker for the user:** subagent fan-out is unavailable until the monthly
-spend limit is raised (claude.ai/settings/usage). The remaining work is all
-doable inline, just slower.
+1. **Reference-delta round 3** — `npm run capture --out docs/shots/phase3-hero.png`,
+   rank the ten gaps in `docs/DELTA.md`, fix the top three, re-render. DELTA
+   #5/#6 (wall machinery density, console greebling) are the carried
+   next-cheapest wins. The laser array is new geometry in the frame — grade it.
+2. **`node tools/verify.mjs --phase 3`** — the battery. Watch the **bundle**: it
+   is at 495.0 KB of a 500 KiB floor (~5 KB headroom), and `LaserArray.jsx` +
+   `EndgameSequence.jsx` are what consumed it. The next feature that adds a
+   dependency will breach it.
+3. **gate-verifier dispatch** → fix findings → re-dispatch until PASS → close
+   the gate → STOP for handoff.
+
+Carried: the EnvironmentProbe D-4 debugging round when the fps budget allows;
+Pillar-C residual under D-4 (acceptance test `tools/pixel-check.mjs`).
 
 ## Gotchas (append-only; newest first)
 
 _(Carry forward the hard-won ones from `handoff.md` as they recur under the new stack; add new ones here rather than re-debugging.)_
 
+- **A prop's interaction radius must be smaller than the gap between props of the same kind.** `LaserArray.resolveTarget` (like every console on this deck) takes the FIRST station within range, so two mirrors 2.86 m apart with a 3 m `STATION_RANGE` meant standing at one rotated the other, unreachably. Any new seeded prop needs `separation > STATION_RANGE`, enforced in the generator and pinned by a test.
+- **An idle teammate is a solid capsule.** Inactive characters keep their colliders, so one parked in a doorway blocks the character you are driving. It cost an hour of e2e debugging that looked like a phantom collider; the give-away was that the *other* player's stored position had drifted.
+- **Press/release stepping in an e2e walker is 3× slower than holding the key.** The hover droid decelerates between steps and the walk becomes CDP round-trips: puzzle3 passed alone but timed out inside the full suite. Hold the key, poll position, change the key only when the direction changes (`greedyWalk`), and always release in a `finally`. Also: a walker's wall bound must sit OUTSIDE what the capsule can actually reach (9.6, not 9.4) — a character resting past the bound has every probe rejected and deadlocks in the corner.
+- **In an e2e, a swap keypress that silently fails is invisible and catastrophic**: the walker drives the wrong character while polling a position that never changes, so it reads as "stuck against a wall". Always poll `activePlayerId` after a `1`/`2`/`3` press before moving (`swapTo` in puzzle3.spec.js), and assert the character you drive is the active one.
+- **Bind one key to two actions and the input throttle will eat one of them.** `E` fed both `applyDir` and `applyOpen`; `applyDir` stamped the throttle clock even when it had nothing to steer, so the aperture could never open. Only arm a throttle when an action actually fires.
 - **The GPU canary is blind to CPU/compositor contention.** 2026-07-08 Phase-2 re-bisect: successively CHEAPER render configs measured 59→56→55 fps while the raw-ALU canary read a healthy 60 every run — the canary only proves the GPU itself is free, not that Chrome/CDP/compositor scheduling is. Symptom of an invalid window: fps moves opposite to the change you made. Treat any floor decision from such a window as unmeasured and re-run idle; consider adding a CPU canary to perf-probe.
 - **`npm run capture` with no `--out` writes to `docs/shots/phase0-hero.png`** and will silently overwrite the historical Phase-0 gate shot (it did, 2026-07-08 — restored from git). Always pass `--out docs/shots/phase<N>-hero.png`.
 - **Playwright keystroke bursts stretch under machine load**: six `keyboard.press` round-trips can exceed P2's arm window (1.5 s at the time; 3.0 s since D-6) on a loaded box, correctly failing into lockout — e2e flake, not a bug. `puzzle2.spec.js` retries the identical burst after the cooldown (never relaxes the mechanic).
