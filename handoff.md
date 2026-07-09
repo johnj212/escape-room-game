@@ -7,51 +7,138 @@
 
 ---
 
-## 0a. Current session handoff (2026-07-09, fourth session — PHASE 3 FEATURE-COMPLETE, gate open) — READ FIRST
+## 0a. Current session handoff (2026-07-09, fourth session — PHASE 3 FEATURE-COMPLETE, gate OPEN) — READ FIRST
 
-**Read `STATUS.md` → "Phase 3 progress" for the full, evidence-backed state.**
+> This section is written to be **self-contained**: a fresh context window needs
+> only this, `STATUS.md`, and `Project_Requirements.md` to continue. Nothing from
+> the originating conversation is required.
 
-Puzzle 3 is built, wired, and green end-to-end: shared machine + server chain +
-client props/store/net/HUD + win/lose sequences. Verified this session:
-`vitest 102/102`, `lint 0`, client build clean, `authority-probe 14/14 (exit 0)`
-including a full legitimate 1→2→3 escape to `phase='win'`, and the
-**full Playwright suite 8/8** (solo-swap full escape + misfire lockout + all
-Phase 0–2 specs, serial, 2.5 min).
+### Rehydration order
 
-**NOT run: `npm run verify`, perf-probe, hero capture** — all GPU-serial and the
-user reported a busy machine. **No fps or triangle claim is made for Phase 3.**
+1. `STATUS.md` in full (especially "Phase 3 progress" and "Gotchas").
+2. `Project_Requirements.md` (the brief — pillars, §2 floors, banned outcomes).
+3. `docs/R3F-WEBGPU-NOTES.md` (verified stack facts — do NOT re-derive).
+4. Skim `docs/DEVIATIONS.md` (D-1..D-6) and the newest `docs/DELTA.md` entry.
+5. **Never re-plan from scratch.** Continue from "What's left" below.
 
-**Resume at STATUS.md "Next session starts here"**: reference-delta round 3,
-then `verify.mjs --phase 3`, then the gate-verifier dispatch. All need an idle
-machine.
+### State: Phase 3 is feature-complete. The gate is NOT closed.
 
-**Watch the bundle.** Measured the way the gate measures it (JS+CSS gzip, excl.
-the Rapier WASM chunk): **495.0 KB of a 500 KiB floor — ~5 KB of headroom.**
-`LaserArray.jsx` + `EndgameSequence.jsx` ate it. The next dependency breaches it.
-(Ignore any "504 KB" figure: that is vite's 1000-based main-chunk number, not
-the floor's metric.)
+Puzzle 3 (Laser Deflection Array) is built, wired, and green end to end: the
+shared state machine, the server-authoritative 2→3 chain, the client props /
+store / net / HUD, and the win/lose sequences. `main` is clean at `6c1cac4`.
 
-Lessons from this session, worth carrying:
+**Verified with tool runs (2026-07-09) — everything below was observed, not inferred:**
 
-- **Contract-first fan-out survives a hard cutoff.** Both Sonnet subagents were
-  killed mid-task by a spend limit. Because `shared/laserPuzzle.js` was written
-  and committed FIRST, neither death corrupted the design and the server track
-  had already finished and verified independently.
+| Check | Result |
+| --- | --- |
+| `npx playwright test --workers=1` (full suite) | **8/8 passed**, 2.5 min |
+| `npx vitest run` (from `client/`) | **102/102** |
+| `npm run lint --prefix client` | **0 warnings** |
+| `npm run build --prefix client` | clean |
+| `node tools/authority-probe.mjs` | **14/14 PASS, exit 0** |
+| Bundle (JS+CSS gzip, excl. Rapier WASM — the gate's own metric) | **495.0 KB / 500 KiB floor** |
+
+**NOT run this session, therefore NOT claimed:** `npm run verify`, `npm run perf`,
+`npm run capture`. All GPU-serial; the user's machine was busy.
+**No fps or triangle claim exists for Phase 3.** Do not repeat one from memory.
+
+### What shipped
+
+- **`shared/laserPuzzle.js`** — the single source of truth (pure, clock-injected,
+  dependency-free). The server `require()`s it; the solo client imports it, same
+  pattern as `scannerPuzzle.js`. `traceLaser` is the raycast. Engineer steers the
+  emitter arc, Technician rotates 3 mirror mounts, Overseer opens a 10 s aperture
+  latch (the latch is what lets solo-swap solve the *identical* puzzle). An
+  aligned beam resting on a SHUT aperture past `MISFIRE_GRACE_MS` → lockout.
+  Every timing/step constant carries a literal pin test (the D-6 lesson).
+- **Server** — `puzzleState` is `{ stage: 1|2|3, p1, p2, p3 }`. The P2 solve no
+  longer wins; it advances to stage 3. Only the P3 raycast solve sets
+  `phase='win'`. Three new events (`steer-emitter`, `rotate-mirror`,
+  `open-aperture`) trust **no** client payload for role or position. `tickLaser`
+  runs at 30 Hz, so the tick alone can win or fail the game.
+- **Client** — `LaserArray.jsx` (procedural emitter / mirrors / receiver iris,
+  beam rendered straight from `traceLaser`'s polyline), store actions + solo tick
+  pump, `laser-result` ack, per-role stage-3 HUD objective, mobile ◀/▶ pair.
+- **`EndgameSequence.jsx`** — diegetic escape-pod/blast-door on win, meltdown wash
+  on lose, plus timer-driven alarm escalation that mutates the **existing**
+  lights. No new light, no new shadow caster, no new pass. Respects
+  `prefers-reduced-motion`; pulse rate capped for photosensitivity.
+- **Pillar A is proven empirically.** No Technician: exhaustive over all 49
+  headings × 50 seeds → never a hit. No Engineer: exhaustive over all 72³ =
+  373,248 mirror combinations at the initial heading → 0 hits. No Overseer: an
+  aligned beam misfires into lockout instead of winning. **Mutation control:** the
+  same 373k sweep at the *solution* heading yields 5,719 hits, so the test is not
+  vacuous.
+
+### What's left (all GPU-serial — idle machine only)
+
+A contended window has produced invalid fps numbers twice on this project. Never
+spend D-5 knobs on numbers from one; re-run idle instead.
+
+1. **Reference-delta round 3** — `npm run capture --out docs/shots/phase3-hero.png`
+   (always pass `--out`, or it overwrites the Phase-0 gate shot), rank the ten
+   gaps in `docs/DELTA.md`, fix the top three, re-render. The laser array is new
+   geometry in the frame — grade it. Carried cheapest wins: DELTA #5/#6 (wall
+   machinery density, console greebling).
+2. **`node tools/verify.mjs --phase 3`** — the battery. Do not pipe it through
+   `tail`; that swallows the exit code.
+3. **`gate-verifier` dispatch** → fix findings → re-dispatch until PASS → close
+   the gate → STOP for handoff (the user's phase protocol).
+
+**Watch the bundle.** 495.0 KB of a 500 KiB floor is **~5 KB of headroom**;
+`LaserArray.jsx` + `EndgameSequence.jsx` consumed it. The next feature that adds
+a dependency breaches a §2 floor. (Ignore any "504 KB" figure — that is vite's
+1000-based main-chunk number, not the floor's metric.)
+
+Also carried: the `EnvironmentProbe` D-4 debugging round when the fps budget
+allows; the Pillar-C residual under D-4 (acceptance test `tools/pixel-check.mjs`).
+
+### Four real bugs this session, all disguised as flaky tests
+
+A green 102-test unit suite and a passing 14/14 server probe held throughout.
+Every one of these is about the **room**, not the rules:
+
+1. **The Overseer's aperture could never be opened from the keyboard**, making P3
+   literally unsolvable. `E` fed both `applyDir` and `applyOpen`; `applyDir`
+   armed the 90 ms input throttle even with nothing to steer, throttling out the
+   `applyOpen` that followed in the same keypress. Found by *reading the input
+   path*, not by any test.
+2. **Two mirrors could spawn inside one 3 m interaction radius.**
+   `resolveTarget` takes the first station in range, so standing at one mirror
+   rotated the other and the player could never turn it. Separation is now
+   `STATION_RANGE + 0.4`.
+3. **The deck's only doorway was ~0.3 m wide.** The partition spanned z ∈ [-8, 8]
+   and the overseer's pedestal sits at [0, 8.5], in the gap between its end and
+   the back wall. P1/P2 never require a crossing; P3 seeds mirrors on both sides.
+   Pane shortened to 12 m (z ∈ [-6, 6]). Role separation is unaffected — the role
+   gates enforce it, and the consoles sit at z=0.
+4. **The emitter arc's end-stop.** Centred on +x, 11/200 seeds put the winning
+   heading exactly on a dial stop where the Engineer cannot steer further. Arc
+   recentred on +34° with a 2-step end margin. *(A fifth, fixed earlier: a mirror
+   could spawn on a player spawn point and wedge that character for the round.)*
+
+All four now carry regression tests.
+
+### Lessons worth carrying
+
 - **A test that fails twice in the same place means the diagnosis is wrong, not
-  that the test needs adjusting.** Every one of this session's four real bugs
-  arrived disguised as a flaky test: the emitter arc end-stop, the mirror inside
-  a player spawn, two mirrors sharing one interaction radius, and a 0.3 m
-  doorway. The unit suite was green through all of them.
-- **Prove a Pillar-A test isn't vacuous.** The 373k-combination no-Engineer
-  sweep returns 0 hits — but the same sweep at the solution heading returns
-  5,719. Without that control, "0 hits" could just mean the tracer was broken.
+  that the test needs adjusting.** Every bug above first read as a flake.
 - **e2e is the only thing that tests the ROOM.** Unit tests and the authority
-  probe both passed while the deck contained a doorway no character could fit
-  through and a mirror the player could never rotate. Geometry bugs need a
-  character walking through the geometry.
-- **Read the input path before spending five minutes on an e2e run.** The bug
-  that made P3 literally unsolvable (E-key throttle eating the aperture open)
-  was found by reading `applyDir`/`applyOpen`, not by any test.
+  probe both passed while the deck contained a doorway no character fit through
+  and a mirror no player could rotate. Geometry bugs need a character walking the
+  geometry.
+- **Prove an exhaustive Pillar-A test isn't vacuous** by running the same sweep at
+  the solution config and confirming it *does* find hits.
+- **Contract-first fan-out survives a hard cutoff.** Both Sonnet subagents were
+  killed mid-task by a spend limit; because `shared/laserPuzzle.js` was written
+  and committed FIRST, the design held and the server track had already verified
+  independently.
+- **e2e walker mechanics** (now encoded in `puzzle3.spec.js`): hold the movement
+  key and poll, never press/release-step (3× slower; times out under load);
+  always verify a `1`/`2`/`3` swap landed before walking, or you drive the wrong
+  character while polling a position that never moves; an **idle teammate is a
+  solid capsule** and will block a doorway; a walker's wall bound must sit outside
+  what the capsule can actually reach, or it deadlocks in a corner.
 
 ---
 
