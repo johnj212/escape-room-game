@@ -19,6 +19,20 @@ import {
 
 const T0 = 100_000
 
+describe('timing constants — spec pins (docs/DEVIATIONS.md)', () => {
+  // Every other test uses the constants symbolically, so the suite passes for
+  // ANY window value — these literal pins are what make a silent change to a
+  // spec number fail loudly. The Phase-2 gate-verifier caught exactly that:
+  // ARM_WINDOW_MS drifted 1500→3000 with no paper trail (now D-6).
+  it('ARM_WINDOW_MS is 3000 ms (D-6 — user playtest widening of the §3.14 1.5 s spec)', () => {
+    expect(ARM_WINDOW_MS).toBe(3000)
+  })
+  it('LATCH_MS is 4000 ms and LOCKOUT_MS is 5000 ms (§3.14 as specified)', () => {
+    expect(LATCH_MS).toBe(4000)
+    expect(LOCKOUT_MS).toBe(5000)
+  })
+})
+
 function activeState() {
   return activateScanners(createScannerState())
 }

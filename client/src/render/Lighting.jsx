@@ -34,9 +34,13 @@ const FIXTURES = {
   // Sector bounce fills (shadowless, mimic wall-neon bounce until probes).
   // Pulled toward the consoles (±7) since the dedicated console task lights
   // were consolidated away — one light per sector does both jobs now.
+  // Intensity/reach raised 2026-07-09 (Phase-2 gate, Pillar C): the side
+  // walls sit near the fills' old `distance` cutoff, reading ~0 — the hero
+  // frame's edge bands pixel-measured 98%/55% below the 5%-sRGB bar
+  // (tools/pixel-check.mjs). Same light count, zero per-pixel cost.
   fills: [
-    [-7, 4.5, 0, '#00f3ff', 16, 12], // Engineer wall + console wash
-    [7, 4.5, 0, '#ff007f', 16, 12], // Technician wall + console wash
+    [-7, 4.5, 0, '#00f3ff', 24, 17], // Engineer wall + console wash
+    [7, 4.5, 0, '#ff007f', 36, 19], // Technician wall + console wash
   ],
 }
 
@@ -96,8 +100,12 @@ export const Lighting = ({ isMobile = false }) => {
       {/* Raised 2026-07-08 after the Phase-1 gate-verifier pixel-measured
           37–77% near-black side-wall area post-D-5 (Pillar C flag). Same
           light count — intensity-only, zero per-pixel cost. */}
-      <hemisphereLight args={['#46587e', '#1a2030', 6.0]} />
-      <ambientLight intensity={2.0} color="#2e5560" />
+      {/* Raised again 2026-07-09 (Phase-2 gate-verifier, Pillar C): right
+          hero band measured 98.5% below 5%-sRGB luminance vs the reference's
+          37% (tools/pixel-check.mjs, --band 0.85,1.0). Ground tint warmed so
+          the lift carries the reactor-red wall color instead of graying it. */}
+      <hemisphereLight args={['#46587e', '#2a2430', 8.5]} />
+      <ambientLight intensity={2.9} color="#3a5560" />
 
       {/* Key light: 4-cascade CSM (desktop) / 2-cascade (mobile) */}
       <CSMKeyLight isMobile={isMobile} />

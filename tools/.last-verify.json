@@ -1,9 +1,9 @@
 {
-  "phase": 1,
-  "timestamp": "2026-07-08T10:33:32.118Z",
+  "phase": 2,
+  "timestamp": "2026-07-09T05:20:54.899Z",
   "overallPass": true,
-  "hardTotal": 5,
-  "hardPassed": 5,
+  "hardTotal": 6,
+  "hardPassed": 6,
   "checks": [
     {
       "id": 1,
@@ -11,7 +11,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 899,
+      "durationMs": 825,
       "note": "0 warnings/errors"
     },
     {
@@ -20,7 +20,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 1010,
+      "durationMs": 899,
       "note": "all specs passed"
     },
     {
@@ -29,25 +29,34 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 7578,
+      "durationMs": 33460,
       "note": "e2e suite green"
     },
     {
       "id": 4,
+      "name": "Server-authority probe (Pillar D)",
+      "hard": true,
+      "pass": true,
+      "status": "PASS",
+      "durationMs": 12792,
+      "note": "all authority assertions passed"
+    },
+    {
+      "id": 5,
       "name": "Perf floors desktop (perf-probe assert)",
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 65289,
+      "durationMs": 65096,
       "note": "§2 desktop floors met"
     },
     {
-      "id": 5,
+      "id": 6,
       "name": "Perf floors mobile (perf-probe assert)",
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 65205,
+      "durationMs": 65057,
       "note": "§2 mobile floors met"
     }
   ]

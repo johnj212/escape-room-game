@@ -2,6 +2,23 @@
 
 The reference-delta loop is verification check **#1** and runs **every phase** (`Project_Requirements.md` §5). Newest entry first.
 
+---
+
+## 2026-07-09 — Phase 2 — gate-verifier Pillar-C round (reproducible pixel measurement + edge-band lift)
+
+Shot: `docs/shots/phase2-hero.png` (re-rendered this round). Reference: `reference/sector9_deck_hero.png`.
+
+**Measurement is now reproducible:** `tools/pixel-check.mjs` (new, committed — Playwright-decoded, Rec.709 linear luminance, band histograms) replaces the ad hoc scratch sampling behind earlier "% < 5% luminance" claims. The gate-verifier could not reproduce those numbers; nobody can re-derive an uncommitted methodology. All numbers below: `--band <x0,x1> --threshold 0.0037` (≈ 5%-sRGB).
+
+**Verifier finding confirmed, but not a regression:** the right edge band (x 85–100%) measured 98.5% below the bar with mean linear luminance 0.0026 — *pixel-identical* between the Phase-2 and accepted-Phase-1 gate shots (round-2's "no regression" claim verified; its "61%" figure was the old ad hoc methodology). The reference's same band: 36.8% below, mean 0.0488 — the absolute gap is real and is the D-3/D-4 no-bounce-GI signature.
+
+**What was tried, measured per iteration (all zero-per-pixel-cost — same light count, constants only):**
+1. Hemisphere 6.0→8.5 (+ warmer ground `#2a2430`), ambient 2.0→2.9, vignette floor 0.8→0.88 → left band 67.1→55.6%, right 98.5→98.2% (the right band barely responds to global fill).
+2. Fog color `#0b101b`→`#1c2136` + background lift → **zero effect on either band** (those pixels sit nearer than the fog start at 13); kept anyway for far-field haze/airglow (this log's standing gap #3).
+3. Sector fills raised/reached (engineer 16cd/dist12→24/17, technician 16/12→36/19 — the side walls sat at the old `distance` cutoff) → right 98.2→**95.9%** (mean 0.0026→0.0032, +23%), left 55.6→**45.2%** (mean 0.0106→0.0119).
+
+**Where it lands:** right band 95.9% vs reference 36.8%. Directed-light constants are past diminishing returns; the residual is missing bounce/GI (and a magenta wash scores structurally low on Rec.709 luminance — red weighs 0.21). Closing the rest is the **D-4 environment-probe payback (Phase 5)**, now verifiable against a committed measurement tool. Visual check this round: composition and cipher legibility hold, corners read tinted rather than void, no washout.
+
 **Procedure per phase:** render the closest matching hero shot of the Sector-9 deck → place it side-by-side with `reference/media__new_visuals.png` (and any relevant UE5 stills in `reference/`) → list the **ten most visually significant differences, ranked by impact** → fix the top three → re-render → only then does the phase close.
 
 **Entry format:**

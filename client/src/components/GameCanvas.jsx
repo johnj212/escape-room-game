@@ -165,8 +165,13 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
           C); wall band re-pixel-checked after this change. Linear fog, not
           FogExp2: the exp2 variant measured ~1 fps (per-pixel exp() in every
           material) in the 2026-07-08 re-bisect. */}
-      <color attach="background" args={['#05060a']} />
-      <fog attach="fog" args={['#0b101b', 13, 42]} />
+      {/* Fog color lifted #0b101b → #1c2136 (2026-07-09, Phase-2 gate,
+          Pillar C): the far right hero band measured 98% below 5%-sRGB
+          luminance and light-intensity raises didn't move it — those pixels
+          are fog-dominated, so only the fog color itself can lift them.
+          Doubles as the reference's visible-haze airglow (DELTA #3). */}
+      <color attach="background" args={['#0a0d16']} />
+      <fog attach="fog" args={['#1c2136', 13, 42]} />
 
       {/* Lighting rig (render/Lighting.jsx): CSM key light, fixture-driven
           fills, sector washes, reactor glow — Pillars C + F. */}
