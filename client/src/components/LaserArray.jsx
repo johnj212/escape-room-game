@@ -524,15 +524,24 @@ export const LaserArray = () => {
   )
 
   const lastActionAt = useRef(0)
+  // The throttle must only arm when an action ACTUALLY fires. E is bound to
+  // both applyDir and applyOpen; if applyDir stamped the clock while standing
+  // at the receiver (where it has nothing to steer), it would throttle the
+  // applyOpen that follows it in the same keypress and the aperture could
+  // never be opened from the keyboard at all.
   const applyDir = useMemo(
     () => (dir) => {
       const nowMs = performance.now()
       if (nowMs - lastActionAt.current < 90) return // client-side throttle, well under the server's 60/s cap
       const target = resolveTarget()
       if (!target) return
-      lastActionAt.current = nowMs
-      if (target.kind === 'emitter') steerEmitterAction(dir)
-      else if (target.kind === 'mirror') rotateMirrorAction(target.index, dir)
+      if (target.kind === 'emitter') {
+        lastActionAt.current = nowMs
+        steerEmitterAction(dir)
+      } else if (target.kind === 'mirror') {
+        lastActionAt.current = nowMs
+        rotateMirrorAction(target.index, dir)
+      }
     },
     [resolveTarget, steerEmitterAction, rotateMirrorAction]
   )

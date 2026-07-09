@@ -138,12 +138,16 @@ test.describe('Puzzle 2 — Tri-Vector Hand Scanners (1 → 2 chain, solo-swap)'
     expect(
       await page.evaluate(() => window.useGameStore.getState().puzzleState.p2.status)
     ).toBe('solved')
+
+    // Phase 3: the P2 solve no longer wins — it advances the chain to stage 3
+    // and powers up the laser deflection array. puzzle3.spec.js owns the escape.
     await expect
-      .poll(() => page.evaluate(() => window.useGameStore.getState().gamePhase), {
+      .poll(() => page.evaluate(() => window.useGameStore.getState().puzzleState.stage), {
         timeout: 5_000,
       })
-      .toBe('win')
-    await expect(page.getByText('SECTOR-9 STABILIZED')).toBeVisible()
+      .toBe(3)
+    expect(await page.evaluate(() => window.useGameStore.getState().puzzleState.p3.status)).toBe('active')
+    expect(await page.evaluate(() => window.useGameStore.getState().gamePhase)).toBe('playing')
 
     expect(problems.physicsRescues).toEqual([])
     expect(problems.pageErrors).toEqual([])
@@ -181,14 +185,15 @@ test.describe('Puzzle 2 — Tri-Vector Hand Scanners (1 → 2 chain, solo-swap)'
     expect(duringLockout.armedAt.engineer).toBeNull()
     expect(duringLockout.failCount).toBe(1)
 
-    // Cooldown (5 s) expires → active again → the identical puzzle solves.
+    // Cooldown (5 s) expires → active again → the identical puzzle solves and
+    // the chain advances to stage 3 (the laser array), not to a win.
     // (swapArmAllThree itself waits for 'active' before each burst.)
     await swapArmAllThree(page)
     await expect
-      .poll(() => page.evaluate(() => window.useGameStore.getState().gamePhase), {
+      .poll(() => page.evaluate(() => window.useGameStore.getState().puzzleState.stage), {
         timeout: 5_000,
       })
-      .toBe('win')
+      .toBe(3)
 
     expect(problems.physicsRescues).toEqual([])
     expect(problems.pageErrors).toEqual([])
