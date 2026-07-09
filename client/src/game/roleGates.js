@@ -7,6 +7,7 @@
 // amendment 2026-07-04): the solo player swaps characters to change role.
 
 import { SCANNER_POSITIONS, SCANNER_RANGE } from '../../../shared/scannerPuzzle.js'
+import { LASER_ROLES, STATION_RANGE as LASER_STATION_RANGE } from '../../../shared/laserPuzzle.js'
 
 export const SWITCHBOARD_POS = [5, 0]
 export const HOLOGRAM_POS = [-5, 0]
@@ -53,6 +54,47 @@ export function scannerAccess(viewer, scannerRole, gamePhase = 'playing', range 
   if (!pos) return 'out-of-range'
   if (distanceXZ(viewer.position, pos) >= range) return 'out-of-range'
   return viewer.role === scannerRole ? 'arm' : 'role-locked'
+}
+
+// Which role may operate each P3 laser station. Mirror stations share the
+// technician role (LASER_ROLES.mirror) regardless of index — the layout
+// generator (shared/laserPuzzle.js createLaserLayout) decides WHERE the
+// three mirrors sit per seed, not WHO may turn them.
+const LASER_STATION_ROLE = {
+  emitter: LASER_ROLES.emitter,
+  mirror0: LASER_ROLES.mirror,
+  mirror1: LASER_ROLES.mirror,
+  mirror2: LASER_ROLES.mirror,
+  receiver: LASER_ROLES.receiver,
+}
+
+/**
+ * Puzzle 3 ACTION gate (Pillar A, 3 roles). Exactly one role may operate
+ * each station kind: the Engineer steers the emitter, the Technician
+ * rotates any mirror, the Overseer opens the receiver aperture. Any other
+ * role in range is refused with a role lock. Mirror positions are
+ * seed-dependent (shared/laserPuzzle.js createLaserLayout draws them per
+ * room) so — unlike the fixed SCANNER_POSITIONS table — the caller passes
+ * `position` explicitly for every station (emitter/receiver included, for
+ * symmetry with the mirrors and so nothing here duplicates the shared
+ * module's geometry constants). No solo parameter exists: the solo player
+ * swaps characters to act as each role.
+ * @param {{role:string, position:number[]}} viewer
+ * @param {'emitter'|'mirror0'|'mirror1'|'mirror2'|'receiver'} station
+ * @param {[number, number]} position station's live [x, z] deck position
+ * @returns {'operate'|'role-locked'|'out-of-range'}
+ */
+export function laserStationAccess(
+  viewer,
+  station,
+  position,
+  gamePhase = 'playing',
+  range = LASER_STATION_RANGE
+) {
+  const role = LASER_STATION_ROLE[station]
+  if (!viewer || !role || !position || gamePhase !== 'playing') return 'out-of-range'
+  if (distanceXZ(viewer.position, position) >= range) return 'out-of-range'
+  return viewer.role === role ? 'operate' : 'role-locked'
 }
 
 /**

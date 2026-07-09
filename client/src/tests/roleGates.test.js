@@ -5,10 +5,12 @@ import {
   switchboardAccess,
   cipherLegible,
   scannerAccess,
+  laserStationAccess,
   SWITCHBOARD_POS,
   HOLOGRAM_POS,
 } from '../game/roleGates'
 import { SCANNER_ROLES, SCANNER_POSITIONS } from '../../../shared/scannerPuzzle.js'
+import { LASER_ROLES, EMITTER_POS, RECEIVER_POS } from '../../../shared/laserPuzzle.js'
 
 // Pillar A, Puzzle 1 (2 roles): automated proof that the puzzle cannot be
 // driven by fewer than the required roles' sightline + inputs, and that
@@ -109,5 +111,89 @@ describe('Pillar A — Puzzle 2 scanner gates (3 roles, no solo exemption)', () 
     expect(scannerAccess(eng, 'engineer', 'lobby')).toBe('out-of-range')
     expect(scannerAccess(null, 'engineer')).toBe('out-of-range')
     expect(scannerAccess(eng, 'not-a-role')).toBe('out-of-range')
+  })
+})
+
+// Pillar A, Puzzle 3 (3 roles): each laser station belongs to exactly one
+// role — the emitter to the Engineer, every mirror to the Technician, the
+// receiver to the Overseer — regardless of where a given seed's layout
+// places the mirrors (positions are passed in live, never hardcoded here).
+// Every role × station × in/out-of-range combination is enumerated, proving
+// no single role can operate all three station KINDS (emitter, mirror,
+// receiver), matching the shared machine's structural no-single-role proofs.
+describe('Pillar A — Puzzle 3 laser station gates (3 roles, no solo exemption)', () => {
+  const ALL_ROLES = ['engineer', 'technician', 'overseer']
+  // Seed-dependent-style mirror positions for the test — arbitrary points
+  // distinct from EMITTER_POS/RECEIVER_POS, standing in for a live layout.
+  const MIRROR_POS = { mirror0: [-2, 2], mirror1: [3, -3.5], mirror2: [0.5, 6] }
+  const STATION_POS = {
+    emitter: EMITTER_POS,
+    mirror0: MIRROR_POS.mirror0,
+    mirror1: MIRROR_POS.mirror1,
+    mirror2: MIRROR_POS.mirror2,
+    receiver: RECEIVER_POS,
+  }
+  const STATION_ROLE = {
+    emitter: LASER_ROLES.emitter,
+    mirror0: LASER_ROLES.mirror,
+    mirror1: LASER_ROLES.mirror,
+    mirror2: LASER_ROLES.mirror,
+    receiver: LASER_ROLES.receiver,
+  }
+  const STATIONS = Object.keys(STATION_POS)
+  const farAwayXZ = [40, 40]
+
+  it('every role x station combination: operate iff the role matches and is in range', () => {
+    for (const station of STATIONS) {
+      const pos = STATION_POS[station]
+      for (const role of ALL_ROLES) {
+        const atStation = viewer(role, at(pos))
+        const expected = role === STATION_ROLE[station] ? 'operate' : 'role-locked'
+        expect(laserStationAccess(atStation, station, pos)).toBe(expected)
+        expect(laserStationAccess(viewer(role, at(farAwayXZ)), station, pos)).toBe('out-of-range')
+      }
+    }
+  })
+
+  it('exactly one role can operate each station — three distinct actors are structurally required', () => {
+    for (const station of STATIONS) {
+      const pos = STATION_POS[station]
+      const operators = ALL_ROLES.filter(
+        (r) => laserStationAccess(viewer(r, at(pos)), station, pos) === 'operate'
+      )
+      expect(operators).toEqual([STATION_ROLE[station]])
+    }
+  })
+
+  it('no single role can operate all three station KINDS (emitter, mirror, receiver)', () => {
+    for (const role of ALL_ROLES) {
+      const canEmitter = laserStationAccess(viewer(role, at(EMITTER_POS)), 'emitter', EMITTER_POS) === 'operate'
+      const canMirror = ['mirror0', 'mirror1', 'mirror2'].some(
+        (m) => laserStationAccess(viewer(role, at(MIRROR_POS[m])), m, MIRROR_POS[m]) === 'operate'
+      )
+      const canReceiver = laserStationAccess(viewer(role, at(RECEIVER_POS)), 'receiver', RECEIVER_POS) === 'operate'
+      const kindsOperable = [canEmitter, canMirror, canReceiver].filter(Boolean).length
+      expect(kindsOperable).toBe(1)
+    }
+    // ...and each kind IS operable by its own role.
+    expect(laserStationAccess(viewer('engineer', at(EMITTER_POS)), 'emitter', EMITTER_POS)).toBe('operate')
+    expect(laserStationAccess(viewer('technician', at(MIRROR_POS.mirror0)), 'mirror0', MIRROR_POS.mirror0)).toBe('operate')
+    expect(laserStationAccess(viewer('overseer', at(RECEIVER_POS)), 'receiver', RECEIVER_POS)).toBe('operate')
+  })
+
+  it('laser station gates close outside the playing phase and on bad/missing input', () => {
+    const eng = viewer('engineer', at(EMITTER_POS))
+    expect(laserStationAccess(eng, 'emitter', EMITTER_POS, 'lobby')).toBe('out-of-range')
+    expect(laserStationAccess(null, 'emitter', EMITTER_POS)).toBe('out-of-range')
+    expect(laserStationAccess(eng, 'not-a-station', EMITTER_POS)).toBe('out-of-range')
+    expect(laserStationAccess(eng, 'emitter', null)).toBe('out-of-range')
+  })
+
+  it('the solo-swap role bypass must never return for the laser gate either (source audit)', () => {
+    const gateSource = fs.readFileSync(
+      path.resolve(__dirname, '../game/roleGates.js'),
+      'utf8'
+    )
+    expect(gateSource).not.toMatch(/isSolo/)
   })
 })
