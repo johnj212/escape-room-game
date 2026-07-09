@@ -6,6 +6,7 @@
 // React lifecycles); shared value nodes are built per-factory so materials
 // stay independently tweakable.
 
+import { useEffect, useState } from 'react'
 import {
   MeshStandardNodeMaterial,
   MeshPhysicalNodeMaterial,
@@ -241,4 +242,81 @@ export function motesMaterial({ tint = '#cfe8ff' } = {}) {
   mat.colorNode = color(tint).mul(drift.mul(0.25).add(0.35))
   mat.opacityNode = drift.mul(0.1).add(0.05)
   return mat
+}
+
+// -- alarm escalation (Pillar F, §3.17) --------------------------------------
+//
+// Single source of truth for "how urgent the room is right now", shared by
+// render/Lighting.jsx (fixture color/intensity) and
+// components/EndgameSequence.jsx (blast door / meltdown wash) so the two
+// systems can never drift out of sync — the same lesson D-6 (docs/DEVIATIONS.md)
+// already paid for once with a duplicated timing constant. Lives here (not a
+// material, but this is the one file both owners share) rather than as a
+// third new file, per the Phase-3 file-ownership split.
+//
+// Bands over the 900s meltdown timer: nominal (>300s) -> elevated (300-120s,
+// gentle ramp) -> critical (<120s, "the last two minutes" per the brief,
+// where the ramp is steep). `lose` forces max urgency; `win` fades to calm
+// regardless of the clock.
+export const ALARM_ELEVATED_S = 300
+export const ALARM_CRITICAL_S = 120
+// Pulse frequency cap: stays well under the ~3 Hz flash-safety line even at
+// maximum escalation (photosensitivity hazard, brief §4).
+export const ALARM_MAX_PULSE_HZ = 2.2
+
+/**
+ * Pure escalation factor in [0,1] from the live meltdown timer + gamePhase.
+ * 0 = nominal room tone, 1 = maximum urgency.
+ */
+export function alarmEscalation(timerSeconds, gamePhase) {
+  const creep = Math.min(1, Math.max(0, 1 - timerSeconds / 900))
+  let criticalT
+  if (timerSeconds <= ALARM_CRITICAL_S) {
+    criticalT = Math.min(1, Math.max(0, 1 - timerSeconds / ALARM_CRITICAL_S))
+  } else if (timerSeconds <= ALARM_ELEVATED_S) {
+    criticalT =
+      Math.min(
+        1,
+        Math.max(0, 1 - (timerSeconds - ALARM_CRITICAL_S) / (ALARM_ELEVATED_S - ALARM_CRITICAL_S))
+      ) * 0.35
+  } else {
+    criticalT = 0
+  }
+  let e = Math.min(1, creep * 0.25 + criticalT * 0.9)
+  if (gamePhase === 'lose') e = 1
+  if (gamePhase === 'win') e = 0
+  return e
+}
+
+/**
+ * Pulse multiplier for emissive/light intensity: both amplitude and
+ * frequency grow with escalation, both capped (never a strobe). Reduced
+ * motion holds the mean (1.0) instead of oscillating — the pulse itself is
+ * the thing `prefers-reduced-motion` must kill.
+ */
+export function alarmPulse(elapsedSeconds, escalation, reducedMotion) {
+  if (reducedMotion) return 1
+  const hz = 0.25 + escalation * (ALARM_MAX_PULSE_HZ - 0.25)
+  return 1 + Math.sin(elapsedSeconds * hz * Math.PI * 2) * (0.08 + escalation * 0.3)
+}
+
+/**
+ * Shared `prefers-reduced-motion` read, live-updating on OS/browser change.
+ * Every escalation-driven pulse (Lighting.jsx, EndgameSequence.jsx) must
+ * gate through this — quality law §4: every overlay/effect respects it.
+ */
+export function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false
+  )
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const onChange = () => setReduced(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return reduced
 }

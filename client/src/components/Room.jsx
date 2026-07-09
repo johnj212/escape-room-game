@@ -62,15 +62,24 @@ export const Room = () => {
       </RigidBody>
 
       {/* 3. Security partition: splits Engineer (left) / Technician (right)
-          sectors — the physical enforcement of P1's information/action split. */}
+          sectors — the physical enforcement of P1's information/action split.
+          It spans z ∈ [-6, 6], NOT the full room: the deck's only crossing is
+          the doorway past its +z end, and the overseer's scanner pedestal sits
+          in that doorway at [0, 8.5]. At the original 16 m length the gap left
+          roughly 0.3 m of walkable floor between pedestal and back wall — P1
+          and P2 never require a character to cross, so nothing caught it, but
+          P3 seeds mirror mounts on BOTH sides and the Technician must get
+          through. 12 m leaves a clear ~1.5 m doorway either side of the
+          pedestal without weakening the sector split (the consoles sit at z=0,
+          and role separation is enforced by the role gates regardless). */}
       <RigidBody type="fixed" colliders="cuboid" includeInvisible>
         <mesh position={[0, 2, 0]} material={glassMat}>
-          <boxGeometry args={[0.2, 4, 16]} />
+          <boxGeometry args={[0.2, 4, 12]} />
         </mesh>
-        <mesh position={[0, 2, -8]} material={postMat}>
+        <mesh position={[0, 2, -6]} material={postMat}>
           <cylinderGeometry args={[0.1, 0.1, 4, 16]} />
         </mesh>
-        <mesh position={[0, 2, 8]} material={postMat}>
+        <mesh position={[0, 2, 6]} material={postMat}>
           <cylinderGeometry args={[0.1, 0.1, 4, 16]} />
         </mesh>
       </RigidBody>

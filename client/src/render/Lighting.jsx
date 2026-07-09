@@ -1,9 +1,10 @@
-import { useEffect, useMemo } from 'react'
-import { useThree } from '@react-three/fiber'
+import { useEffect, useMemo, useRef } from 'react'
+import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { CSMShadowNode } from 'three/examples/jsm/csm/CSMShadowNode.js'
-import { neonMaterial } from './materials'
+import { neonMaterial, alarmEscalation, alarmPulse, usePrefersReducedMotion } from './materials'
 import { sceneLights } from './lightRegistry'
+import { useGameStore } from '../store/gameStore'
 
 // Sector-9 lighting rig (§3.4, Pillars C + F).
 //
@@ -78,7 +79,80 @@ const CSMKeyLight = ({ isMobile }) => {
   return null
 }
 
+// Alarm escalation (Pillar F, §3.17): as the meltdown timer burns down, the
+// reactor glow, the alarm spot and the two sector fills shift hue toward red
+// and pulse harder — driven entirely by mutating the existing Light
+// instances' `.color`/`.intensity` each frame (no new lights, no TSL —
+// same "plain per-frame mutation" pattern ScannerStations.jsx uses for its
+// pedestal materials). `alarmEscalation`/`alarmPulse` (render/materials.js)
+// are the single source of truth also read by components/EndgameSequence.jsx
+// so the two systems can't drift. Reads the store via `getState()` inside
+// useFrame (not a subscription) — this must run every frame regardless of
+// React re-renders, and a subscription would double-drive it.
+const REACTOR_BASE_COLOR = new THREE.Color('#ff6a2a')
+const REACTOR_ALARM_COLOR = new THREE.Color('#ff1a1a')
+const ALARM_SPOT_BASE_COLOR = new THREE.Color('#ff007f')
+const ALARM_SPOT_CRITICAL_COLOR = new THREE.Color('#ff0000')
+const FILL_CRITICAL_COLOR = new THREE.Color('#ff2020')
+
+const AlarmEscalation = ({ reactorRef, alarmSpotRef, fillRefs, fillBaseColors }) => {
+  const reducedMotion = usePrefersReducedMotion()
+  const scratch = useRef(new THREE.Color()).current
+
+  useFrame((state, delta) => {
+    const { timer, gamePhase } = useGameStore.getState()
+    const e = alarmEscalation(timer, gamePhase)
+    const pulse = alarmPulse(state.clock.elapsedTime, e, reducedMotion)
+    // Clamp to <=1: WebGPU pipeline-compile frame hitches spike delta, and an
+    // unclamped lerp factor overshoots and oscillates forever (STATUS.md
+    // gotcha log).
+    const k = Math.min(1, 2.5 * delta)
+
+    const reactor = reactorRef.current
+    if (reactor) {
+      scratch.copy(REACTOR_BASE_COLOR).lerp(REACTOR_ALARM_COLOR, e)
+      reactor.color.lerp(scratch, k)
+      const target = (55 + e * 90) * pulse
+      reactor.intensity = THREE.MathUtils.lerp(reactor.intensity, target, k)
+    }
+
+    const alarmSpot = alarmSpotRef.current
+    if (alarmSpot) {
+      scratch.copy(ALARM_SPOT_BASE_COLOR).lerp(ALARM_SPOT_CRITICAL_COLOR, e)
+      alarmSpot.color.lerp(scratch, k)
+      const target = (140 + e * 220) * pulse
+      alarmSpot.intensity = THREE.MathUtils.lerp(alarmSpot.intensity, target, k)
+    }
+
+    fillRefs.current.forEach((light, i) => {
+      if (!light) return
+      const base = fillBaseColors[i]
+      scratch.copy(base).lerp(FILL_CRITICAL_COLOR, e * 0.7)
+      light.color.lerp(scratch, k)
+      const baseIntensity = base.__intensity ?? light.intensity
+      const target = baseIntensity * (1 + e * 0.6) * (0.85 + pulse * 0.15)
+      light.intensity = THREE.MathUtils.lerp(light.intensity, target, k)
+    })
+  })
+
+  return null
+}
+
 export const Lighting = ({ isMobile = false }) => {
+  const reactorRef = useRef(null)
+  const alarmSpotRef = useRef(null)
+  const fillRefs = useRef([])
+  // Base intensities captured once so the escalation target is always
+  // relative to the authored value, never compounding onto its own output.
+  const fillBaseColors = useMemo(
+    () =>
+      FIXTURES.fills.map(([, , , tint, intensity]) => {
+        const c = new THREE.Color(tint)
+        c.__intensity = intensity
+        return c
+      }),
+    []
+  )
   const panelMat = useMemo(
     // 1.7: just over the bloom threshold for a tight halo — 3.2 blew the
     // ceiling into a frame-wide white haze (delta round 1, gap #1 family).
@@ -130,6 +204,9 @@ export const Lighting = ({ isMobile = false }) => {
       {FIXTURES.fills.map(([x, y, z, tint, intensity, distance], i) => (
         <pointLight
           key={`fill-${i}`}
+          ref={(light) => {
+            fillRefs.current[i] = light
+          }}
           position={[x, y, z]}
           color={tint}
           intensity={intensity}
@@ -142,6 +219,7 @@ export const Lighting = ({ isMobile = false }) => {
           Shadowless: a wide soft wash reads identically without occlusion,
           and its shadow map was a full extra render pass per frame. */}
       <spotLight
+        ref={alarmSpotRef}
         position={[0, 7.5, -9]}
         angle={Math.PI / 2.5}
         penumbra={0.9}
@@ -156,6 +234,7 @@ export const Lighting = ({ isMobile = false }) => {
         // plenty for soft volumetric occlusion.
         ref={(light) => {
           sceneLights.reactor = light ?? undefined
+          reactorRef.current = light
         }}
         position={[0, 3.9, -8.8]}
         color="#ff6a2a"
@@ -172,6 +251,15 @@ export const Lighting = ({ isMobile = false }) => {
           bloom; their dedicated point lights were cut in the 2026-07-08
           light-count consolidation (fps floor). The sector fills above keep
           role color pooling on the plating near each console. */}
+
+      {/* Alarm escalation (Pillar F): mutates the fixtures above every
+          frame, zero new lights/draw calls. */}
+      <AlarmEscalation
+        reactorRef={reactorRef}
+        alarmSpotRef={alarmSpotRef}
+        fillRefs={fillRefs}
+        fillBaseColors={fillBaseColors}
+      />
     </>
   )
 }

@@ -16,6 +16,7 @@ import { Player } from './Player'
 import { WirePuzzle } from './WirePuzzle'
 import { ScannerStations } from './ScannerStations'
 import { LaserArray } from './LaserArray'
+import { EndgameSequence } from './EndgameSequence'
 
 // Harness instrumentation: exposes live render stats + a scene-ready flag on
 // `window` for the verification tooling (tools/perf-probe.mjs, PerfHud).
@@ -190,6 +191,7 @@ export const GameCanvas = ({ inputRef, emitMovement }) => {
         <WirePuzzle />
         <ScannerStations />
         <LaserArray />
+        <EndgameSequence />
 
         {/* Render all players in the room */}
         {Object.values(players).map((p) => (

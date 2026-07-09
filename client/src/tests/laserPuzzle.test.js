@@ -136,6 +136,43 @@ describe('determinism (§1: ?seed=N reproduces the laser layout)', () => {
     }
   })
 
+  it('never places two mirrors within STATION_RANGE of each other', () => {
+    // Regression: proximity alone picks which mirror the Technician operates
+    // (LaserArray.resolveTarget takes the first in range). Seed 132 once put
+    // two mounts 2.86 m apart, so standing at one rotated the other and the
+    // player could never turn it — the e2e caught it as a mirror that would
+    // not move.
+    for (let seed = 0; seed < 200; seed++) {
+      const { layout } = createLaserLayout(seed)
+      for (let i = 0; i < MIRROR_COUNT; i++) {
+        for (let j = i + 1; j < MIRROR_COUNT; j++) {
+          const a = layout.mirrors[i].pos
+          const b = layout.mirrors[j].pos
+          expect(Math.hypot(a[0] - b[0], a[1] - b[1])).toBeGreaterThan(STATION_RANGE)
+        }
+      }
+    }
+  })
+
+  it('never drops a mirror on a player spawn — a collider there wedges that character', () => {
+    // Regression: seed 9 placed a mirror 0.95 m from the technician's spawn.
+    // The character began the round inside its collider and could not move at
+    // all; the Phase-3 e2e caught it as a walk that never converged.
+    const spawns = [
+      [-3, -2], // engineer
+      [3, -2], // technician
+      [-2, 4], // overseer
+    ]
+    for (let seed = 0; seed < 200; seed++) {
+      const { layout } = createLaserLayout(seed)
+      for (const m of layout.mirrors) {
+        for (const [sx, sz] of spawns) {
+          expect(Math.hypot(m.pos[0] - sx, m.pos[1] - sz)).toBeGreaterThanOrEqual(2.2)
+        }
+      }
+    }
+  })
+
   it('never puts the solution on an arc stop — the Engineer can always steer both ways', () => {
     // Regression: with the arc centred on +x, solutions piled against the
     // upper stop (11/200 sat exactly on it) and the dial would not turn.

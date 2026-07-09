@@ -238,14 +238,22 @@ function attemptRng(seed, attempt) {
   return mulberry32(h >>> 0)
 }
 
-// Existing deck props mirrors must keep clear of (P1 consoles, P2 pedestals).
+// Existing deck features a mirror must keep clear of. The player SPAWNS are in
+// this list because a mirror's collider dropped on top of one wedges that
+// character in place at round start — they cannot walk at all. (Found by the
+// Phase-3 e2e: seed 9 put a mirror 0.95 m from the technician's spawn.)
 const PROP_CLEARANCE_POINTS = [
   [-5, 0], [5, 0], // P1 hologram / switchboard
   [-6.5, 3.5], [6.5, 3.5], [0, 8.5], // P2 scanner pedestals
+  [-3, -2], [3, -2], [-2, 4], // engineer / technician / overseer spawns
 ]
 const MIRROR_ZONE = { x: [-7, 7], z: [-6.5, 6.5] }
 const MIRROR_PROP_CLEAR = 2.2
-const MIRROR_MIRROR_CLEAR = 2.5
+// Two mirrors must never be within STATION_RANGE of each other. Proximity
+// alone selects which mirror a Technician operates (LaserArray.resolveTarget
+// takes the first in range), so overlapping radii would rotate the wrong
+// mount and leave the player no way to reach the other one.
+const MIRROR_MIRROR_CLEAR = STATION_RANGE + 0.4
 const MIRROR_PARTITION_CLEAR = 1.2 // |x| — keep props off the glass line
 const CONSTRUCT_TOL = 0.5 // max closest-approach miss during construction
 const NO_ENGINEER_MARGIN = 0.4 // structural clearance beyond a mirror's max reach
