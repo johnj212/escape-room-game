@@ -10,6 +10,17 @@ const {
   SCANNER_POSITIONS,
   SCANNER_RANGE,
 } = require('../shared/scannerPuzzle.js');
+const {
+  activateLaser,
+  steerEmitter,
+  rotateMirror,
+  openAperture,
+  EMITTER_POS,
+  RECEIVER_POS,
+  STATION_RANGE,
+  MIRROR_COUNT,
+  LASER_ROLES,
+} = require('../shared/laserPuzzle.js');
 
 // P1 switchboard console position ([x, z]) — same forgiving radius as the P2 scanners.
 // Only the technician standing here may toggle a wire switch (Pillar D hardening).
@@ -64,13 +75,16 @@ const checkRateLimit = (socketId) => {
 io.on('connection', (socket) => {
   let currentRoomId = null;
 
-  socket.on('create-room', ({ name, role }) => {
+  socket.on('create-room', ({ name, role, seed }) => {
     if (!checkRateLimit(socket.id)) return;
-    
+
     // Generate a unique 4-letter room code
     const roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const room = gameLoop.createRoom(roomId);
-    
+    // §1 determinism: an explicit seed (e.g. client's ?seed=N) is honoured verbatim;
+    // otherwise gameLoop.createRoom mints a fresh random per-room seed.
+    const explicitSeed = Number.isFinite(seed) ? seed : undefined;
+    const room = gameLoop.createRoom(roomId, explicitSeed);
+
     joinRoomSocket(roomId, name, role);
   });
 
@@ -240,10 +254,129 @@ io.on('connection', (socket) => {
     const { state, result } = armScanner(room.puzzleState.p2, player.role, Date.now());
     room.puzzleState.p2 = state;
     if (result === 'solved') {
-      room.phase = 'win';
+      // P2 solved advances the chain into P3 — it no longer wins the game.
+      // Only the P3 laser solve (steer-emitter / rotate-mirror / open-aperture,
+      // or the clock-driven tick) sets phase = 'win'.
+      room.puzzleState.stage = 3;
+      room.puzzleState.p3 = activateLaser(room.puzzleState.p3);
     }
 
     socket.emit('scanner-result', { result });
+    io.to(currentRoomId).emit('room-state', room);
+  });
+
+  // ---------------------------------------------------------------------
+  // P3 — Laser Deflection Array. Role and position are always resolved from
+  // the server's own room.players[socket.id] record, never trusted from the
+  // client payload — mirrors the arm-scanner pattern exactly.
+  // ---------------------------------------------------------------------
+
+  socket.on('steer-emitter', ({ dir }) => {
+    if (!checkRateLimit(socket.id)) return;
+    if (!currentRoomId) return;
+    const room = gameLoop.getRoom(currentRoomId);
+    if (!room || room.phase !== 'playing') return;
+    if (room.puzzleState.stage !== 3) return;
+
+    const player = room.players[socket.id];
+    if (!player) return;
+
+    if (player.role !== LASER_ROLES.emitter) {
+      socket.emit('error-msg', 'Only the engineer may steer the emitter.');
+      return;
+    }
+    if (!inRangeXZ(player.position, EMITTER_POS, STATION_RANGE)) {
+      socket.emit('error-msg', 'Too far from the emitter.');
+      return;
+    }
+
+    // Sanitise dir server-side: only +1 or -1 survive; anything non-finite is rejected.
+    if (!Number.isFinite(dir) || dir === 0) {
+      socket.emit('error-msg', 'Invalid steering direction.');
+      return;
+    }
+    const safeDir = Math.sign(dir);
+
+    const { state, result } = steerEmitter(room.puzzleState.p3, safeDir, Date.now());
+    room.puzzleState.p3 = state;
+    if (result === 'solved') {
+      room.phase = 'win';
+    }
+
+    socket.emit('laser-result', { result });
+    io.to(currentRoomId).emit('room-state', room);
+  });
+
+  socket.on('rotate-mirror', ({ index, dir }) => {
+    if (!checkRateLimit(socket.id)) return;
+    if (!currentRoomId) return;
+    const room = gameLoop.getRoom(currentRoomId);
+    if (!room || room.phase !== 'playing') return;
+    if (room.puzzleState.stage !== 3) return;
+
+    const player = room.players[socket.id];
+    if (!player) return;
+
+    if (player.role !== LASER_ROLES.mirror) {
+      socket.emit('error-msg', 'Only the technician may rotate the mirrors.');
+      return;
+    }
+
+    // Reject early with error-msg rather than relying solely on the shared
+    // machine's own guard (defense in depth, per spec).
+    if (!Number.isInteger(index) || index < 0 || index >= MIRROR_COUNT) {
+      socket.emit('error-msg', 'Invalid mirror index.');
+      return;
+    }
+
+    const mirrorPos = room.puzzleState.p3.layout.mirrors[index]?.pos;
+    if (!mirrorPos || !inRangeXZ(player.position, mirrorPos, STATION_RANGE)) {
+      socket.emit('error-msg', 'Too far from that mirror.');
+      return;
+    }
+
+    if (!Number.isFinite(dir) || dir === 0) {
+      socket.emit('error-msg', 'Invalid rotation direction.');
+      return;
+    }
+    const safeDir = Math.sign(dir);
+
+    const { state, result } = rotateMirror(room.puzzleState.p3, index, safeDir, Date.now());
+    room.puzzleState.p3 = state;
+    if (result === 'solved') {
+      room.phase = 'win';
+    }
+
+    socket.emit('laser-result', { result });
+    io.to(currentRoomId).emit('room-state', room);
+  });
+
+  socket.on('open-aperture', () => {
+    if (!checkRateLimit(socket.id)) return;
+    if (!currentRoomId) return;
+    const room = gameLoop.getRoom(currentRoomId);
+    if (!room || room.phase !== 'playing') return;
+    if (room.puzzleState.stage !== 3) return;
+
+    const player = room.players[socket.id];
+    if (!player) return;
+
+    if (player.role !== LASER_ROLES.receiver) {
+      socket.emit('error-msg', 'Only the overseer may open the aperture.');
+      return;
+    }
+    if (!inRangeXZ(player.position, RECEIVER_POS, STATION_RANGE)) {
+      socket.emit('error-msg', 'Too far from the receiver.');
+      return;
+    }
+
+    const { state, result } = openAperture(room.puzzleState.p3, Date.now());
+    room.puzzleState.p3 = state;
+    if (result === 'solved') {
+      room.phase = 'win';
+    }
+
+    socket.emit('laser-result', { result });
     io.to(currentRoomId).emit('room-state', room);
   });
 

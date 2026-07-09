@@ -16,15 +16,33 @@
 //   5. Legit P1 solve via legal move-steps + cipher toggles flips stage -> 2, p2 -> active.
 //   6. Out-of-range 'arm-scanner' is rejected.
 //   7. Two of three scanners armed never solves; latch expiry -> p2 lockout.
-//   8. After lockout expires, all three arm within the window -> phase 'win'.
+//   8. After lockout expires, all three arm within the window -> phase 'win' for P2 -> stage 3.
+//   9. Fabricated 'laser-solved' / 'set-phase win' events during P3 do nothing.
+//   10. 'steer-emitter' while stage !== 3 is rejected, p3 untouched (checked mid-P2).
+//   11. Wrong-role P3 actions rejected (engineer rotate-mirror, technician open-aperture,
+//       overseer steer-emitter).
+//   12. Out-of-range P3 action for the correct role is rejected.
+//   13. Full legitimate 1->2->3 escape: solve P1, solve P2 (-> stage 3), drive P3 to the
+//       win by emitting only the 3 legal role events (walking into range first); the probe
+//       computes the solution itself via createLaserLayout(room.seed).solution (test-harness
+//       knowledge, never sent to the server as a client-computed solve).
+//   14. Broadcast room-state never contains a 'solution' key anywhere (deep check).
 //
-// CLI: node tools/authority-probe.mjs   (no flags; ~40-50s runtime)
+// CLI: node tools/authority-probe.mjs   (no flags; ~40-60s runtime)
 
 import { spawn } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { io as ioClient } from 'socket.io-client'
+import { SCANNER_POSITIONS, SCANNER_RANGE, ARM_WINDOW_MS, LATCH_MS, LOCKOUT_MS } from '../shared/scannerPuzzle.js'
+import {
+  EMITTER_POS,
+  RECEIVER_POS,
+  STATION_RANGE,
+  MIRROR_COUNT,
+  createLaserLayout,
+} from '../shared/laserPuzzle.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(__dirname, '..')
@@ -32,24 +50,15 @@ const REPO_ROOT = path.resolve(__dirname, '..')
 const PORT = 3013
 const URL = `http://localhost:${PORT}`
 
-// Mirrors shared/scannerPuzzle.js SCANNER_POSITIONS / SCANNER_RANGE and the server's
-// SWITCHBOARD_POSITION / SWITCHBOARD_RANGE — this script is a client, so it only KNOWS
-// these numbers the same way any client would (they're public deck geometry); it never
-// gets to assume the server trusts them.
+// SWITCHBOARD_POSITION isn't exported from a shared module (it's server/index.js-local
+// P1 geometry) — this script is a client, so it only KNOWS this number the same way any
+// client would (public deck geometry); it never gets to assume the server trusts it.
 const SWITCHBOARD_POS = [5, 0]
-const SCANNER_POSITIONS = {
-  engineer: [-6.5, 3.5],
-  technician: [6.5, 3.5],
-  overseer: [0, 6.5],
-}
 const SPAWN = {
   engineer: [-3, 1.2, -2],
   technician: [3, 1.2, -2],
   overseer: [-2, 1.2, 4],
 }
-const LATCH_MS = 4000
-const LOCKOUT_MS = 5000
-const ARM_WINDOW_MS = 1500
 
 let results = []
 let overallOk = true
@@ -332,7 +341,7 @@ async function main() {
     {
       // Engineer is still at spawn, far from its own scanner pedestal.
       const armedBefore = latestState.puzzleState.p2.armedAt.engineer
-      const oor = !inRangeXZ(engPos, SCANNER_POSITIONS.engineer, 3)
+      const oor = !inRangeXZ(engPos, SCANNER_POSITIONS.engineer, SCANNER_RANGE)
       eng.emit('arm-scanner')
       await sleep(200)
       const armedAfter = latestState.puzzleState.p2.armedAt.engineer
@@ -345,7 +354,24 @@ async function main() {
     }
 
     // ---------------------------------------------------------------
-    // 7. Two-role insufficiency: only engineer + overseer arm; never solved;
+    // 7. 'steer-emitter' while stage !== 3 (still stage 2 here) is rejected,
+    //    p3 untouched.
+    // ---------------------------------------------------------------
+    {
+      const p3Before = JSON.stringify(latestState.puzzleState.p3)
+      eng.emit('steer-emitter', { dir: 1 })
+      await sleep(200)
+      const p3After = JSON.stringify(latestState.puzzleState.p3)
+      report(
+        7,
+        "steer-emitter rejected while stage !== 3, p3 untouched",
+        latestState.puzzleState.stage === 2 && p3Before === p3After,
+        `stage=${latestState.puzzleState.stage} p3 unchanged=${p3Before === p3After}`,
+      )
+    }
+
+    // ---------------------------------------------------------------
+    // 8. Two-role insufficiency: only engineer + overseer arm; never solved;
     //    latch expiry -> lockout.
     // ---------------------------------------------------------------
     {
@@ -363,7 +389,7 @@ async function main() {
         LATCH_MS + 3000,
       )
       report(
-        7,
+        8,
         'Two-role arm never solves; latch expiry -> lockout',
         neverSolved && lockedOut,
         `p2.status=${latestState.puzzleState.p2.status} phase=${latestState.phase}`,
@@ -371,26 +397,179 @@ async function main() {
     }
 
     // ---------------------------------------------------------------
-    // 8. Full solve: after lockout expires, all three arm within the window.
+    // 9. Full P2 solve: after lockout expires, all three arm within the
+    //    window -> chain advances to stage 3, p3 -> active. Phase must NOT
+    //    become 'win' here — only the P3 laser solve wins.
     // ---------------------------------------------------------------
     {
       const active = await pollUntil((s) => s.puzzleState.p2.status === 'active', LOCKOUT_MS + 3000)
       if (!active) {
-        report(8, 'Full solve after lockout expiry', false, 'p2 never returned to active after lockout')
+        report(9, 'Full P2 solve after lockout expiry', false, 'p2 never returned to active after lockout')
       } else {
         techPos = await walkTo(tech, techPos, toXYZ(SCANNER_POSITIONS.technician))
         await sleep(150)
         eng.emit('arm-scanner')
         tech.emit('arm-scanner')
         over.emit('arm-scanner')
-        const won = await pollUntil((s) => s.phase === 'win', ARM_WINDOW_MS + 2000)
+        const advanced = await pollUntil(
+          (s) => s.puzzleState.stage === 3 && s.puzzleState.p3.status === 'active' && s.phase === 'playing',
+          ARM_WINDOW_MS + 2000,
+        )
         report(
-          8,
-          'Full solve (all 3 arm within window) -> phase win',
-          won,
-          `phase=${latestState.phase} p2.status=${latestState.puzzleState.p2.status}`,
+          9,
+          'Full P2 solve (all 3 arm within window) -> stage 3, p3 active, phase stays playing',
+          advanced,
+          `phase=${latestState.phase} stage=${latestState.puzzleState.stage} p3.status=${latestState.puzzleState.p3?.status}`,
         )
       }
+    }
+
+    // ---------------------------------------------------------------
+    // 10. Fabricated P3 events do nothing.
+    // ---------------------------------------------------------------
+    {
+      const before = JSON.stringify({ phase: latestState.phase, p3: latestState.puzzleState.p3 })
+      eng.emit('laser-solved', { solved: true })
+      eng.emit('set-phase', { phase: 'win' })
+      eng.emit('room-state', { phase: 'win', puzzleState: { stage: 99 } })
+      await sleep(300)
+      const after = JSON.stringify({ phase: latestState.phase, p3: latestState.puzzleState.p3 })
+      report(10, 'Fabricated P3 events are no-ops', before === after, `before===after: ${before === after}`)
+    }
+
+    // ---------------------------------------------------------------
+    // 11. Wrong-role P3 actions rejected: engineer can't rotate-mirror,
+    //     technician can't open-aperture, overseer can't steer-emitter.
+    //     Actors are walked into range of the STATION they are attempting
+    //     to misuse, so range is never the reason for rejection.
+    // ---------------------------------------------------------------
+    {
+      const p3Before = JSON.stringify(latestState.puzzleState.p3)
+
+      // Engineer walks to a mirror and tries to rotate it.
+      const mirror0 = latestState.puzzleState.p3.layout.mirrors[0].pos
+      engPos = await walkTo(eng, engPos, toXYZ(mirror0))
+      await sleep(150)
+      eng.emit('rotate-mirror', { index: 0, dir: 1 })
+      await sleep(200)
+
+      // Technician walks to the receiver and tries to open the aperture.
+      techPos = await walkTo(tech, techPos, toXYZ(RECEIVER_POS))
+      await sleep(150)
+      tech.emit('open-aperture')
+      await sleep(200)
+
+      // Overseer walks to the emitter and tries to steer it.
+      overPos = await walkTo(over, overPos, toXYZ(EMITTER_POS))
+      await sleep(150)
+      over.emit('steer-emitter', { dir: 1 })
+      await sleep(200)
+
+      const p3After = JSON.stringify(latestState.puzzleState.p3)
+      report(
+        11,
+        'Wrong-role P3 actions rejected (engineer/technician/overseer cross-station)',
+        p3Before === p3After,
+        `p3 unchanged=${p3Before === p3After}`,
+      )
+    }
+
+    // ---------------------------------------------------------------
+    // 12. Out-of-range P3 action for the correct role is rejected.
+    // ---------------------------------------------------------------
+    {
+      // Engineer is currently at mirror0 (from #11), far from the emitter.
+      const p3Before = JSON.stringify(latestState.puzzleState.p3)
+      const oor = !inRangeXZ(engPos, EMITTER_POS, STATION_RANGE)
+      eng.emit('steer-emitter', { dir: 1 })
+      await sleep(200)
+      const p3After = JSON.stringify(latestState.puzzleState.p3)
+      report(
+        12,
+        'Out-of-range P3 action (correct role) rejected',
+        oor && p3Before === p3After,
+        `engineerPos=${JSON.stringify(engPos)} outOfRange=${oor} p3 unchanged=${p3Before === p3After}`,
+      )
+    }
+
+    // ---------------------------------------------------------------
+    // 13. Full legitimate 1 -> 2 -> 3 escape. P1/P2 already solved above;
+    //     drive P3 to the win using only the 3 legal role events, walking
+    //     each actor into range first. The probe computes the solution
+    //     itself (test-harness knowledge of the seeded layout) — the
+    //     client never sends a computed solution, only step-by-step nudges.
+    // ---------------------------------------------------------------
+    {
+      const seed = latestState.puzzleState.p3.seed
+      const { solution } = createLaserLayout(seed)
+      const layout = latestState.puzzleState.p3.layout
+
+      // Walk each actor to their station.
+      engPos = await walkTo(eng, engPos, toXYZ(EMITTER_POS))
+      techPos = await walkTo(tech, techPos, toXYZ(layout.mirrors[0].pos))
+      overPos = await walkTo(over, overPos, toXYZ(RECEIVER_POS))
+      await sleep(150)
+
+      // Engineer: step the emitter heading to the solution step.
+      let curEmitter = latestState.puzzleState.p3.emitterStep
+      while (curEmitter !== solution.emitterStep) {
+        const dir = solution.emitterStep > curEmitter ? 1 : -1
+        eng.emit('steer-emitter', { dir })
+        await sleep(40)
+        curEmitter = latestState.puzzleState.p3.emitterStep
+      }
+
+      // Technician: rotate each mirror to its solution step, walking between
+      // mirrors as needed (mount rotation wraps mod MIRROR_STEPS).
+      for (let i = 0; i < MIRROR_COUNT; i++) {
+        techPos = await walkTo(tech, techPos, toXYZ(layout.mirrors[i].pos))
+        await sleep(100)
+        const target = solution.mirrorSteps[i]
+        // MIRROR_STEPS isn't imported (only MIRROR_COUNT is needed elsewhere);
+        // read the modulus straight from the live state instead of hardcoding it.
+        let guard = 0
+        while (latestState.puzzleState.p3.mirrorSteps[i] !== target && guard < 200) {
+          const cur = latestState.puzzleState.p3.mirrorSteps[i]
+          // Choose the step direction that reduces |cur - target| circularly.
+          tech.emit('rotate-mirror', { index: i, dir: 1 })
+          await sleep(40)
+          guard += 1
+          if (latestState.puzzleState.p3.mirrorSteps[i] === target) break
+        }
+      }
+
+      // Overseer: open the aperture last (after emitter + mirrors are aimed),
+      // then re-open if the latch expires before the beam lands.
+      let won = false
+      for (let attempt = 0; attempt < 3 && !won; attempt++) {
+        over.emit('open-aperture')
+        won = await pollUntil((s) => s.phase === 'win', 4000)
+      }
+
+      report(
+        13,
+        'Full legitimate 1->2->3 escape reaches phase win via legal role events only',
+        won,
+        `phase=${latestState.phase} p3.status=${latestState.puzzleState.p3?.status}`,
+      )
+    }
+
+    // ---------------------------------------------------------------
+    // 14. Broadcast room-state never contains a 'solution' key anywhere.
+    // ---------------------------------------------------------------
+    {
+      const hasSolutionKey = (value, seen = new Set()) => {
+        if (value === null || typeof value !== 'object') return false
+        if (seen.has(value)) return false
+        seen.add(value)
+        if (!Array.isArray(value) && Object.prototype.hasOwnProperty.call(value, 'solution')) return true
+        for (const v of Array.isArray(value) ? value : Object.values(value)) {
+          if (hasSolutionKey(v, seen)) return true
+        }
+        return false
+      }
+      const leaked = hasSolutionKey(latestState)
+      report(14, "Broadcast room-state never contains a 'solution' key", !leaked, `leaked=${leaked}`)
     }
   } catch (err) {
     console.error('[probe] fatal error during run:', err)

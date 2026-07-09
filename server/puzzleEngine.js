@@ -1,9 +1,11 @@
 // server/puzzleEngine.js
 //
-// Phase 2: the puzzle chain grows to P1 (wire cipher) → P2 (tri-vector scanners),
-// shared/scannerPuzzle.js. Node 22 natively resolves require() of an ESM module,
-// so we pull the P2 state machine in directly rather than duplicating its rules.
+// Phase 3: the puzzle chain grows to P1 (wire cipher) → P2 (tri-vector scanners)
+// → P3 (laser deflection array), shared/scannerPuzzle.js + shared/laserPuzzle.js.
+// Node 22 natively resolves require() of an ESM module, so we pull both state
+// machines in directly rather than duplicating their rules.
 const { createScannerState } = require('../shared/scannerPuzzle.js');
+const { createLaserState } = require('../shared/laserPuzzle.js');
 
 function shuffle(array) {
   const arr = [...array];
@@ -32,13 +34,17 @@ function createP1State() {
 }
 
 module.exports = {
-  // Authoritative chained shape: { stage: 1|2, p1: {...}, p2: <scanner state> }.
-  // p2 starts 'locked' (createScannerState default) until p1.solved activates it.
-  createPuzzleState: () => {
+  // Authoritative chained shape: { stage: 1|2|3, p1: {...}, p2: <scanner state>, p3: <laser state> }.
+  // p2 starts 'locked' until p1.solved activates it; p3 starts 'locked' until p2.solved
+  // activates it (activateLaser). `seed` is the room's per-room seed (§1 determinism) —
+  // the caller (gameLoop.createRoom / resetRoom) passes it through so createLaserLayout
+  // is deterministic for a given room.
+  createPuzzleState: (seed) => {
     return {
       stage: 1,
       p1: createP1State(),
-      p2: createScannerState()
+      p2: createScannerState(),
+      p3: createLaserState(seed)
     };
   },
 

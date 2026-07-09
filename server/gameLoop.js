@@ -1,6 +1,7 @@
 // server/gameLoop.js
 const puzzleEngine = require('./puzzleEngine');
 const { tickScanners } = require('../shared/scannerPuzzle.js');
+const { tickLaser } = require('../shared/laserPuzzle.js');
 
 const rooms = {}; // { [roomId]: roomState }
 // roomState structure:
@@ -8,8 +9,9 @@ const rooms = {}; // { [roomId]: roomState }
 //   id: string,
 //   phase: 'lobby' | 'playing' | 'win' | 'lose',
 //   timer: number,
+//   seed: number, // per-room seed (§1 determinism) — drives createLaserLayout
 //   players: { [id]: { id, name, role, position, rotation, isReady } },
-//   puzzleState: { stage: 1|2, p1: { cipher, currentSwitches, solved }, p2: <scanner state> }
+//   puzzleState: { stage: 1|2|3, p1: {...}, p2: <scanner state>, p3: <laser state> }
 // }
 
 let ioRef = null;
@@ -27,6 +29,16 @@ const initGameLoop = (io) => {
       // lockout expiry both happen here, independent of any player action this tick.
       if (room.puzzleState.stage === 2) {
         room.puzzleState.p2 = tickScanners(room.puzzleState.p2, Date.now());
+      }
+
+      // P3 laser array: same clock-driven pattern — misfire lockout AND the
+      // solve itself are both time-driven (aperture latch / lockout expiry),
+      // so the tick alone must be able to win the game, not only a player action.
+      if (room.puzzleState.stage === 3) {
+        room.puzzleState.p3 = tickLaser(room.puzzleState.p3, Date.now());
+        if (room.puzzleState.p3.status === 'solved') {
+          room.phase = 'win';
+        }
       }
 
       // Decrement timer based on actual elapsed ticks (30Hz = 30 ticks per second)
@@ -55,13 +67,18 @@ const initGameLoop = (io) => {
 
 const getRoom = (roomId) => rooms[roomId];
 
-const createRoom = (roomId) => {
+// `seed` (optional) honours an explicit ?seed=N room creation (§1 determinism);
+// default is a fresh random per-room seed. Stored on the room so resetRoom can
+// regenerate p3 deterministically for the same room.
+const createRoom = (roomId, seed) => {
+  const roomSeed = Number.isFinite(seed) ? seed : Math.floor(Math.random() * 0x7fffffff);
   rooms[roomId] = {
     id: roomId,
     phase: 'lobby',
     timer: 900, // 15 mins
+    seed: roomSeed,
     players: {},
-    puzzleState: puzzleEngine.createPuzzleState(),
+    puzzleState: puzzleEngine.createPuzzleState(roomSeed),
     tickCounter: 0
   };
   return rooms[roomId];
@@ -98,7 +115,7 @@ const resetRoom = (roomId) => {
   room.phase = 'lobby';
   room.timer = 900;
   room.tickCounter = 0;
-  room.puzzleState = puzzleEngine.createPuzzleState();
+  room.puzzleState = puzzleEngine.createPuzzleState(room.seed);
   
   // Reset all players to unready and default spawn positions
   Object.keys(room.players).forEach((socketId) => {
