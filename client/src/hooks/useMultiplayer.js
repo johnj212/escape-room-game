@@ -110,11 +110,28 @@ export const useMultiplayer = () => {
       if (messages[result]) showToast(messages[result])
     })
 
+    // Puzzle 3: per-action laser feedback for THIS client (authoritative
+    // result — the room-state broadcast carries the state itself).
+    socket.on('laser-result', ({ result }) => {
+      const messages = {
+        'rejected-lockout': 'DEFLECTION ARRAY IN LOCKOUT — STAND BY',
+        'rejected-locked': 'DEFLECTION ARRAY OFFLINE — CLEAR THE SCANNER GATE FIRST',
+        'rejected-limit': 'EMITTER GIMBAL AT ITS STOP',
+        solved: 'BEAM LOCKED ON RECEIVER — BLAST DOOR RELEASED',
+      }
+      if (messages[result]) showToast(messages[result])
+    })
+
     // Route store puzzle actions to the authoritative server (Pillar D:
     // components call store actions; the store never solves locally online).
+    // The server resolves role and position from its OWN player record, so
+    // these payloads carry only the action's parameters, never identity.
     useGameStore.getState().registerNetEmitters({
       toggleSwitch: (color) => socket.emit('toggle-switch', { color }),
       armScanner: () => socket.emit('arm-scanner', {}),
+      steerEmitter: (dir) => socket.emit('steer-emitter', { dir }),
+      rotateMirror: (index, dir) => socket.emit('rotate-mirror', { index, dir }),
+      openAperture: () => socket.emit('open-aperture', {}),
     })
 
     return () => {

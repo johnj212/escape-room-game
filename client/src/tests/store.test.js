@@ -106,6 +106,91 @@ describe('Zustand Game Store', () => {
     expect(useGameStore.getState().puzzleState.p2.armedAt.engineer).toBeNull()
   })
 
+  // --- Puzzle 3 (Laser Deflection Array) store wiring ---------------------
+
+  // Walk the solo store through P1 and P2 so stage 3 is live.
+  const soloToStage3 = () => {
+    useGameStore.getState().setIsSolo(true)
+    useGameStore.getState().resetGame()
+    useGameStore.getState().setGamePhase('playing')
+    const { cipher } = useGameStore.getState().puzzleState.p1
+    for (const color of cipher) useGameStore.getState().toggleSwitch(color)
+    for (const role of ['engineer', 'technician', 'overseer']) {
+      useGameStore.getState().armScanner(role)
+    }
+  }
+
+  it('solo P1 solve carries p3 forward (a literal puzzleState here would drop it)', () => {
+    // Regression: the stage-2 transition rebuilt puzzleState as an object
+    // literal, silently deleting p3 — every solo run then threw at stage 3.
+    useGameStore.getState().setIsSolo(true)
+    useGameStore.getState().resetGame()
+    useGameStore.getState().setGamePhase('playing')
+    const { cipher } = useGameStore.getState().puzzleState.p1
+    for (const color of cipher) useGameStore.getState().toggleSwitch(color)
+
+    const { puzzleState } = useGameStore.getState()
+    expect(puzzleState.stage).toBe(2)
+    expect(puzzleState.p3).toBeDefined()
+    expect(puzzleState.p3.status).toBe('locked') // still gated behind P2
+  })
+
+  it('solo P2 solve advances to stage 3 and powers the laser array — it does NOT win', () => {
+    soloToStage3()
+    const { puzzleState, gamePhase } = useGameStore.getState()
+    expect(puzzleState.stage).toBe(3)
+    expect(puzzleState.p2.solved).toBe(true)
+    expect(puzzleState.p3.status).toBe('active')
+    expect(gamePhase).toBe('playing') // win now requires the full 1 → 2 → 3 chain
+  })
+
+  it('solo P3 actions are rejected before stage 3 (chain order is enforced)', () => {
+    useGameStore.getState().setIsSolo(true)
+    useGameStore.getState().resetGame()
+    useGameStore.getState().setGamePhase('playing')
+    expect(useGameStore.getState().puzzleState.stage).toBe(1)
+    expect(useGameStore.getState().steerEmitter(1)).toBeNull()
+    expect(useGameStore.getState().rotateMirror(0, 1)).toBeNull()
+    expect(useGameStore.getState().openAperture()).toBeNull()
+  })
+
+  it('solo P3: the three role actions drive the shared machine', () => {
+    soloToStage3()
+    const before = useGameStore.getState().puzzleState.p3
+
+    expect(useGameStore.getState().openAperture()).toBe('opened')
+    expect(useGameStore.getState().puzzleState.p3.apertureOpenedAt).not.toBeNull()
+
+    expect(useGameStore.getState().steerEmitter(1)).toBe('steered')
+    expect(useGameStore.getState().puzzleState.p3.emitterStep).toBe(before.emitterStep + 1)
+
+    expect(useGameStore.getState().rotateMirror(1, 1)).toBe('rotated')
+    expect(useGameStore.getState().puzzleState.p3.mirrorSteps[1]).toBe(
+      (before.mirrorSteps[1] + 1) % 72
+    )
+  })
+
+  it('online P3 actions emit to the server and NEVER solve locally (Pillar D)', () => {
+    soloToStage3()
+    const snapshot = useGameStore.getState().puzzleState.p3
+    const calls = []
+    useGameStore.getState().setIsSolo(false)
+    useGameStore.getState().registerNetEmitters({
+      steerEmitter: (dir) => calls.push(['steer', dir]),
+      rotateMirror: (i, dir) => calls.push(['rotate', i, dir]),
+      openAperture: () => calls.push(['open']),
+    })
+
+    useGameStore.getState().steerEmitter(-1)
+    useGameStore.getState().rotateMirror(2, 1)
+    useGameStore.getState().openAperture()
+
+    expect(calls).toEqual([['steer', -1], ['rotate', 2, 1], ['open']])
+    // The local machine was not advanced — only the server's broadcast may.
+    expect(useGameStore.getState().puzzleState.p3).toBe(snapshot)
+    expect(useGameStore.getState().gamePhase).toBe('playing')
+  })
+
   it('should set safe spawn heights upon resetting the game', () => {
     useGameStore.getState().resetGame()
     const players = useGameStore.getState().players

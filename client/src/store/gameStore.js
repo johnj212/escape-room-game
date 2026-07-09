@@ -5,11 +5,28 @@ import {
   armScanner as armScannerMachine,
   tickScanners,
 } from '../../../shared/scannerPuzzle.js'
+import {
+  createLaserState,
+  activateLaser,
+  steerEmitter as steerEmitterMachine,
+  rotateMirror as rotateMirrorMachine,
+  openAperture as openApertureMachine,
+  tickLaser,
+} from '../../../shared/laserPuzzle.js'
+
+// Solo layout seed (§1 determinism: `?seed=N` reproduces the laser layout).
+// Read defensively — this module is imported by node-side unit tests too.
+function soloSeed() {
+  if (typeof window === 'undefined' || !window.location) return 9
+  const n = Number.parseInt(new URLSearchParams(window.location.search).get('seed') ?? '', 10)
+  return Number.isFinite(n) ? n : 9 // Sector-9 default
+}
 
 // The chained puzzle state (stage 1 = P1 Decoupled Power Grid, stage 2 = P2
-// Tri-Vector Hand Scanners). The server owns this shape authoritatively in
-// multiplayer; solo mode runs the IDENTICAL machines locally — P2 through the
-// same shared/scannerPuzzle.js module the server executes.
+// Tri-Vector Hand Scanners, stage 3 = P3 Laser Deflection Array). The server
+// owns this shape authoritatively in multiplayer; solo mode runs the IDENTICAL
+// machines locally — P2 and P3 through the same shared/ modules the server
+// executes.
 function freshPuzzleState(cipher) {
   return {
     stage: 1,
@@ -19,6 +36,7 @@ function freshPuzzleState(cipher) {
       solved: false,
     },
     p2: createScannerState(),
+    p3: createLaserState(soloSeed()),
   }
 }
 
@@ -26,6 +44,12 @@ const SCANNER_FAIL_TOASTS = {
   'failed-window': 'SCAN WINDOW MISSED — ARRAY LOCKOUT ENGAGED',
   'rejected-lockout': 'SCANNER ARRAY IN LOCKOUT — STAND BY',
   'rejected-locked': 'SCANNER ARRAY OFFLINE — SYNC THE POWER GRID FIRST',
+}
+
+const LASER_FAIL_TOASTS = {
+  'rejected-lockout': 'DEFLECTION ARRAY IN LOCKOUT — STAND BY',
+  'rejected-locked': 'DEFLECTION ARRAY OFFLINE — CLEAR THE SCANNER GATE FIRST',
+  'rejected-limit': 'EMITTER GIMBAL AT ITS STOP',
 }
 
 export const useGameStore = create((set, get) => ({
@@ -112,6 +136,7 @@ export const useGameStore = create((set, get) => ({
       }, 400);
       return {
         puzzleState: {
+          ...s.puzzleState, // carries p3 forward — a literal here would drop it
           stage: 2,
           p1: { ...p1, currentSwitches, solved: true },
           p2: activateScanners(s.puzzleState.p2),
@@ -133,11 +158,26 @@ export const useGameStore = create((set, get) => ({
     const { puzzleState } = state;
     if (puzzleState.stage !== 2) return null;
     const { state: p2, result } = armScannerMachine(puzzleState.p2, role, Date.now());
-    set({ puzzleState: { ...puzzleState, p2 } });
 
     if (result === 'solved') {
-      setTimeout(() => set({ gamePhase: 'win' }), 1000);
-    } else if (SCANNER_FAIL_TOASTS[result]) {
+      // P2 solved → the chain advances: stage 3, the deflection array powers
+      // up. No win here anymore — escape now runs through the 1 → 2 → 3 chain.
+      set({
+        puzzleState: {
+          ...puzzleState,
+          stage: 3,
+          p2,
+          p3: activateLaser(puzzleState.p3),
+        },
+      });
+      setTimeout(() => {
+        get().showToast('BIOMETRICS ACCEPTED — LASER DEFLECTION ARRAY ONLINE');
+      }, 400);
+      return result;
+    }
+
+    set({ puzzleState: { ...puzzleState, p2 } });
+    if (SCANNER_FAIL_TOASTS[result]) {
       state.showToast(SCANNER_FAIL_TOASTS[result]);
     }
     return result;
@@ -154,6 +194,73 @@ export const useGameStore = create((set, get) => ({
     set({ puzzleState: { ...state.puzzleState, p2: next } });
     if (next.status === 'lockout' && prev.status !== 'lockout') {
       state.showToast('SCAN LATCH EXPIRED — ARRAY LOCKOUT ENGAGED');
+    }
+  },
+
+  // Puzzle 3 (Laser Deflection Array). Solo runs the shared machine locally;
+  // multiplayer emits and trusts ONLY the server's broadcast (Pillar D — the
+  // server re-runs the identical raycast and owns the win).
+  //
+  // `apply` is the shared-machine call for whichever role action fired. All
+  // three actions funnel through here so the solve, the lockout toast and the
+  // win transition have exactly one implementation.
+  _applyLaser: (apply) => {
+    const state = get();
+    const { puzzleState } = state;
+    if (puzzleState.stage !== 3) return null;
+    const { state: p3, result } = apply(puzzleState.p3, Date.now());
+    set({ puzzleState: { ...puzzleState, p3 } });
+
+    if (result === 'solved') {
+      setTimeout(() => set({ gamePhase: 'win' }), 1000);
+    } else if (LASER_FAIL_TOASTS[result]) {
+      state.showToast(LASER_FAIL_TOASTS[result]);
+    }
+    return result;
+  },
+
+  steerEmitter: (dir) => {
+    const state = get();
+    if (!state.isSolo) {
+      state.netEmitters?.steerEmitter?.(dir);
+      return null;
+    }
+    return state._applyLaser((p3, now) => steerEmitterMachine(p3, dir, now));
+  },
+
+  rotateMirror: (index, dir) => {
+    const state = get();
+    if (!state.isSolo) {
+      state.netEmitters?.rotateMirror?.(index, dir);
+      return null;
+    }
+    return state._applyLaser((p3, now) => rotateMirrorMachine(p3, index, dir, now));
+  },
+
+  openAperture: () => {
+    const state = get();
+    if (!state.isSolo) {
+      state.netEmitters?.openAperture?.();
+      return null;
+    }
+    return state._applyLaser((p3, now) => openApertureMachine(p3, now));
+  },
+
+  // Solo time-advance for P3 — mirrors the server's 30 Hz tick. The aperture
+  // latch, the misfire lockout AND the solve are all clock-driven, so this
+  // tick alone must be able to win the game, not only a player action.
+  tickLaserPuzzle: (now = Date.now()) => {
+    const state = get();
+    if (!state.isSolo || state.puzzleState.stage !== 3) return;
+    const prev = state.puzzleState.p3;
+    const next = tickLaser(prev, now);
+    if (next === prev) return;
+    set({ puzzleState: { ...state.puzzleState, p3: next } });
+
+    if (next.status === 'solved' && prev.status !== 'solved') {
+      setTimeout(() => set({ gamePhase: 'win' }), 1000);
+    } else if (next.status === 'lockout' && prev.status !== 'lockout') {
+      state.showToast('SENSOR OVERLOAD — BEAM HELD ON A SEALED APERTURE');
     }
   },
 

@@ -408,6 +408,25 @@ canvas {
   color: var(--bg-primary);
 }
 
+/* Stage-3 laser rotate pair — sits above the USE button. The buttons opt out
+   of .mobile-action-btn's absolute placement so the flex row lays them out. */
+.mobile-laser-dirs {
+  position: absolute;
+  right: 40px;
+  bottom: 285px;
+  display: flex;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.mobile-action-btn.secondary {
+  position: static;
+  width: 58px;
+  height: 58px;
+  font-size: 1.2rem;
+  border-color: var(--neon-magenta, var(--neon-cyan));
+}
+
 /* Lobby Room Card styling */
 .lobby-card {
   width: 100%;

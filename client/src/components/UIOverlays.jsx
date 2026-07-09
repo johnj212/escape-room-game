@@ -17,6 +17,10 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
   const resetGame = useGameStore((state) => state.resetGame)
   const puzzleStage = useGameStore((state) => state.puzzleState.stage)
 
+  // Whoever the player is currently ACTING as — the solo swap changes it, so
+  // the stage-3 objective follows the character, not the seat.
+  const viewerRole = players[isSolo ? activePlayerId : myPlayerId]?.role
+
   // Lobby states
   const [name, setName] = useState('')
   const [inputRoomId, setInputRoomId] = useState('')
@@ -106,6 +110,11 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
       detail: { active }
     })
     window.dispatchEvent(interactEvent)
+  }
+
+  // Stage-3 touch parity for the Q/E rotate pair (LaserArray listens).
+  const handleMobileLaserDir = (dir) => {
+    window.dispatchEvent(new CustomEvent('mobile-laser-dir', { detail: { dir } }))
   }
 
   // 1. Lobby Screen
@@ -298,7 +307,26 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
         <div className="hud-objective">
           <div className="hud-objective-title">Current Objective</div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }} data-testid="hud-objective-text">
-            {puzzleStage === 2 ? (
+            {puzzleStage === 3 ? (
+              // Stage 3 is the only per-ROLE objective — each operator holds a
+              // different station, so the acting character decides the text.
+              viewerRole === 'engineer' ? (
+                <span>
+                  Deflection array online: stand at the emitter and steer its heading with
+                  Q / E. The Overseer calls the shot; the Technician turns the mirrors.
+                </span>
+              ) : viewerRole === 'technician' ? (
+                <span>
+                  Deflection array online: stand at any mirror mount and rotate it with
+                  Q / E to walk the beam toward the receiver.
+                </span>
+              ) : (
+                <span>
+                  Deflection array online: you alone can open the receiver aperture (E) — it
+                  holds for 10 s. Guide the beam in, and never let it rest on a sealed aperture.
+                </span>
+              )
+            ) : puzzleStage === 2 ? (
               <span>
                 Tri-Vector Scanner Array online: all three operators must arm their own
                 vector scanner within the same 3-second window. Miss it and the array locks out.
@@ -351,6 +379,29 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
           >
             USE
           </button>
+
+          {/* Stage 3 only: the emitter/mirror rotate pair. Q/E have no touch
+              equivalent, and Pillar E requires every action to be reachable on
+              touch as well as keyboard. USE (above) doubles as the Overseer's
+              aperture open, exactly as it does for the P1/P2 consoles. */}
+          {puzzleStage === 3 && (
+            <div className="mobile-laser-dirs">
+              <button
+                className="mobile-action-btn secondary"
+                data-testid="mobile-laser-ccw"
+                onTouchStart={() => handleMobileLaserDir(-1)}
+              >
+                ◀
+              </button>
+              <button
+                className="mobile-action-btn secondary"
+                data-testid="mobile-laser-cw"
+                onTouchStart={() => handleMobileLaserDir(1)}
+              >
+                ▶
+              </button>
+            </div>
+          )}
         </div>
       )}
 
