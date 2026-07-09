@@ -113,6 +113,103 @@ All verified with tool evidence this session unless marked pending:
 - **GATE CLOSED (2026-07-09): gate-verifier verdict PASS on re-dispatch** — see the Phase checklist entry. Verifier's non-blocking flags, all handled or carried: stale "1.5 s" comments in `puzzle2.spec.js`/`handoff.md` fixed at gate close; Pillar-C residual carried under D-4 (Phase 5, acceptance test = `tools/pixel-check.mjs`); DELTA #5/#6 (wall machinery density, console greebling) are the next-cheapest visual wins for a future round.
 - **Next: Phase 3 (xhigh)** — Puzzle 3 (laser) + full escape; server-raycast validated; win/lose sequences; reference-delta. All 3 roles required (2026-07-04 amendment); carry the EnvironmentProbe D-4 debugging round when the fps budget allows. **Fresh session starts here per the user's phase protocol.**
 
+## Phase 3 progress (2026-07-09 session — HALTED: monthly spend limit)
+
+**Session ended on an external blocker, not a failure.** Both Sonnet subagents
+(server track + client track) were killed mid-task by "You've hit your monthly
+spend limit". All work that was verifiable was verified and committed; nothing
+is claimed here that a tool result this session did not show.
+
+**DONE + verified (three commits on `main`, tree clean):**
+
+- `d95e5a0` — **`shared/laserPuzzle.js`**: the P3 single source of truth (pure,
+  clock-injected, dependency-free; server `require()`s it, solo client imports
+  it — same pattern as `scannerPuzzle.js`). `traceLaser` is the raycast (2D XZ
+  ray/segment + ray/circle, MAX_BOUNCES reflections; reactor + walls absorb,
+  containment glass transmits). Engineer steers the emitter arc, Technician
+  rotates 3 mirror mounts, Overseer opens a `RECEIVER_HOLD_MS`=10 s aperture
+  latch — the latch is what lets solo-swap solve the IDENTICAL puzzle. An
+  aligned beam resting on a SHUT aperture past `MISFIRE_GRACE_MS` trips a
+  lockout. All timing/step constants carry literal pin tests (the D-6 lesson).
+  **32 unit tests.**
+  - **Pillar A proven empirically, not argued.** No Technician: exhaustive over
+    all 49 headings × 50 seeds → never a hit. No Engineer: exhaustive over all
+    72³ = 373,248 mirror combinations at the initial heading (seed 9) → 0 hits,
+    plus the structural invariant (initial beam clears every mirror's max
+    reach) checked across 50 seeds. No Overseer: an aligned beam misfires into
+    lockout instead of winning. **Mutation control:** the same 373k sweep at the
+    SOLUTION heading yields 5,719 hits — the exhaustive test is not vacuous.
+  - **Gameplay bug found + fixed while testing (would have shipped invisibly):**
+    with the emitter arc centred on +x, 11/200 seeds put the winning heading
+    exactly on an arc end-stop, where the Engineer's dial cannot turn further.
+    Arc recentred on `EMITTER_BASE_DEG`=+34° (where the mirror field actually
+    lies) with a 2-step end margin; regression test added. 300/300 seeds now
+    valid, median solution step 25 of 48. *The whole suite passed symbolically
+    before this — same failure class as D-6.*
+
+- `543f33b` — **server: the 2→3 chain + laser role events.** `puzzleState` is
+  now `{ stage: 1|2|3, p1, p2, p3 }`. **The P2 solve no longer wins** — it
+  advances to stage 3 + `activateLaser`; only the P3 raycast solve sets
+  `phase='win'`. Three new events (`steer-emitter`, `rotate-mirror`,
+  `open-aperture`) trust NO client payload for role or position (both resolved
+  from the server's own `room.players` record), each rate-limited, stage-gated,
+  range-checked, acked via `laser-result`. `gameLoop` runs `tickLaser` at 30 Hz
+  when stage 3 — the latch, the lockout AND the solve are clock-driven, so the
+  tick alone can win the game, not only a player action. `createPuzzleState(seed)`
+  threads a per-room seed (§1 determinism). The solution never enters room state
+  or any broadcast.
+  - **`tools/authority-probe.mjs`: 8 → 14 assertions, 14/14 PASS, exit 0**
+    (re-run independently this session). New: fabricated P3 events are no-ops;
+    `steer-emitter` rejected while stage≠3; wrong-role cross-station actions
+    rejected; out-of-range action by the correct role rejected; **a full
+    legitimate 1→2→3 escape reaches `phase='win'` via legal role events only**;
+    and a deep check that no broadcast ever contains a `solution` key.
+  - Fixed en route: the probe re-declared stale copies of the shared constants
+    (`ARM_WINDOW_MS=1500` vs the shared module's 3000; overseer scanner pos
+    `[0,6.5]` vs `[0,8.5]`). It now imports them from `shared/`. Exactly the
+    drift D-6 exists to prevent.
+
+- `41e4cac` — **client: laser role gates (verified) + `LaserArray.jsx` (WIP,
+  UNWIRED).** `game/roleGates.js` gains `laserStationAccess` (exactly one role
+  per station, no solo parameter) with exhaustive role × station × range unit
+  tests. `components/LaserArray.jsx` (594 lines: procedural emitter/mirror/
+  receiver props + the beam rendered from the shared `traceLaser` polyline) is
+  **committed but NOT wired** — audited clean (clamped lerp factor, no
+  ContactShadows/AdaptiveDpr, no external assets, no new shadow-casting light),
+  but it reads store actions that **do not exist yet**, so it would throw if
+  mounted. Nothing imports it, so lint and build stay green.
+
+**Verified this session:** `vitest 78/78`, `lint 0 warnings`,
+`node tools/authority-probe.mjs → 14/14 PASS (exit 0)`.
+**NOT run this session** (GPU-serial, and the user reported a busy machine):
+e2e, `npm run verify`, perf probe, hero capture. No fps/triangle claim is made.
+
+### Next session starts here (Phase 3, resumed)
+
+1. **Finish the client track** (the only thing blocking e2e):
+   `store/gameStore.js` — add `p3` + `steerEmitter` / `rotateMirror` /
+   `openAperture` (online: emit through `netEmitters`, never solve locally;
+   solo: drive the shared machine) + a `tickLaserPuzzle` solo pump (the solve
+   and the misfire are clock-driven). `hooks/useMultiplayer.js` — register the
+   three emitters + the `laser-result` ack. HUD — stage-3 per-role objective.
+   Then mount `<LaserArray />` in the scene. The component already expects
+   exactly these action names.
+2. **Win/lose sequences** (§3.17): escape-pod launch + meltdown, alarm
+   escalation (Pillar F).
+3. **e2e**: `puzzle3.spec.js` — solo-swap full 1→2→3 escape to the win screen +
+   the lockout path; update `puzzle2.spec.js` (a P2 solve now yields **stage 3**,
+   not a win).
+4. **Reference-delta round 3** + **`node tools/verify.mjs --phase 3`** — both
+   GPU-serial, **idle machine only** (a contended window has produced invalid
+   fps twice; never spend D-5 knobs on those numbers). DELTA #5/#6 (wall
+   machinery density, console greebling) are the next-cheapest visual wins.
+5. **gate-verifier dispatch** → fix findings → re-dispatch → close the gate →
+   STOP for handoff.
+
+**Blocker for the user:** subagent fan-out is unavailable until the monthly
+spend limit is raised (claude.ai/settings/usage). The remaining work is all
+doable inline, just slower.
+
 ## Gotchas (append-only; newest first)
 
 _(Carry forward the hard-won ones from `handoff.md` as they recur under the new stack; add new ones here rather than re-debugging.)_

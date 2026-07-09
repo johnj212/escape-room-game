@@ -7,7 +7,41 @@
 
 ---
 
-## 0. Current session handoff (2026-07-09, third session — PHASE 2 GATE CLOSED) — READ FIRST
+## 0a. Current session handoff (2026-07-09, fourth session — PHASE 3 IN PROGRESS, halted on spend limit) — READ FIRST
+
+**Read `STATUS.md` → "Phase 3 progress" for the full, evidence-backed state.**
+Short version: the P3 laser puzzle's shared machine and the entire server side
+are DONE and verified (authority probe 14/14, exit 0, including a full
+legitimate 1→2→3 escape to `phase='win'`). The client side is half-done:
+`laserStationAccess` role gates are tested and green, and `LaserArray.jsx`
+exists but is **unwired and would throw if mounted** — `gameStore` has no `p3`
+and none of the three actions it calls. Nothing imports it, so lint/tests/build
+are all green on `main`.
+
+**Resume at STATUS.md "Next session starts here" step 1** (finish the client
+track: store actions + solo tick pump, useMultiplayer emitters, HUD, then mount
+the component). Everything after that is unchanged from the plan.
+
+Lessons from this session, worth carrying:
+
+- **Both Sonnet subagents died mid-task on a monthly spend limit.** Because the
+  contract module (`shared/laserPuzzle.js`) was written and committed FIRST,
+  neither death corrupted the design — the server track finished and verified
+  independently. Contract-first fan-out survived a hard cutoff. Keep doing it.
+- **A test that fails twice in the same place is telling you the diagnosis is
+  wrong, not that the test needs adjusting.** Both failures traced to a real
+  gameplay bug: the emitter arc was centred on +x while the mirror field sits
+  up-field, so 11/200 seeds put the winning heading on the dial's end-stop.
+  Recentred to +34°. The suite had passed symbolically the whole time.
+- **Prove a Pillar-A test isn't vacuous.** The 373k-combination no-Engineer
+  sweep returns 0 hits — but the same sweep at the solution heading returns
+  5,719. Without that control, "0 hits" could just mean the trace was broken.
+- GPU-serial work (e2e, verify, perf, capture) was NOT run — the user reported a
+  busy machine. No fps or triangle claim is made for Phase 3.
+
+---
+
+## 0. Previous session handoff (2026-07-09, third session — PHASE 2 GATE CLOSED)
 
 ### Rehydration: read STATUS.md fully (esp. the Phase-2 gate-close entries),
 ### the brief, docs/R3F-WEBGPU-NOTES.md, docs/DEVIATIONS.md (now D-1..D-6), and
