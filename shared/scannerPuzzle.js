@@ -5,7 +5,7 @@
 // solo and 3-client resolve the IDENTICAL puzzle (brief §3.14 / §4).
 //
 // Mechanic (brief §3.14, amendment 2026-07-04):
-// - All three scanners (one per role) must be armed within a 1.5 s rolling
+// - All three scanners (one per role) must be armed within a 3.0 s rolling
 //   window: at the moment the third scanner arms, the spread between the
 //   earliest and latest armedAt must be <= ARM_WINDOW_MS.
 // - Each scanner LATCHES armed for LATCH_MS after activation. The latch is

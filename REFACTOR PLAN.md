@@ -91,7 +91,7 @@ Each lists co-op form → solo form. The asymmetric-information designs from `im
 ### Puzzle 2 — Tri-Vector Hand Scanners (simultaneity)
 
 - Three scanners at room corners, one per role.
-- **Co-op:** all three activate within a 1.5 s window; miss = brief lockout.
+- **Co-op:** all three activate within a 3.0 s window (amended 2026-07-09, D-6); miss = brief lockout.
 - **Solo (plan-then-execute):** walk each avatar to their scanner and *arm* it (FP), then ascend to overhead and hit a 3-second **SYNC EXECUTE** — succeeds only if all three are armed and standing on their pads. The overhead trigger is the solo translation of simultaneity.
 
 ### Puzzle 3 — Laser Deflection Array (spatial coordination)

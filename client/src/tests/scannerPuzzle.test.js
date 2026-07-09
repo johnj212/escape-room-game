@@ -24,7 +24,7 @@ describe('timing constants — spec pins (docs/DEVIATIONS.md)', () => {
   // ANY window value — these literal pins are what make a silent change to a
   // spec number fail loudly. The Phase-2 gate-verifier caught exactly that:
   // ARM_WINDOW_MS drifted 1500→3000 with no paper trail (now D-6).
-  it('ARM_WINDOW_MS is 3000 ms (D-6 — user playtest widening of the §3.14 1.5 s spec)', () => {
+  it('ARM_WINDOW_MS is 3000 ms (§3.14 as amended 2026-07-09 — mobile input timing, D-6)', () => {
     expect(ARM_WINDOW_MS).toBe(3000)
   })
   it('LATCH_MS is 4000 ms and LOCKOUT_MS is 5000 ms (§3.14 as specified)', () => {

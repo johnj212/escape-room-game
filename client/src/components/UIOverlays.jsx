@@ -301,7 +301,7 @@ export const UIOverlays = ({ joinRoom, createRoom, emitReady, emitResetGame }) =
             {puzzleStage === 2 ? (
               <span>
                 Tri-Vector Scanner Array online: all three operators must arm their own
-                vector scanner within the same 1.5s window. Miss it and the array locks out.
+                vector scanner within the same 3-second window. Miss it and the array locks out.
               </span>
             ) : activePlayerId === 'player-1' ? (
               <span>Stand near the left hologram console to read the flashing security wire sequence.</span>

@@ -90,7 +90,7 @@ describe('Zustand Game Store', () => {
     const { cipher } = useGameStore.getState().puzzleState.p1
     for (const color of cipher) useGameStore.getState().toggleSwitch(color)
 
-    // Swap-arm all three roles back-to-back (well inside the 1.5 s window).
+    // Swap-arm all three roles back-to-back (well inside the 3.0 s arm window).
     expect(useGameStore.getState().armScanner('engineer')).toBe('armed')
     expect(useGameStore.getState().armScanner('technician')).toBe('armed')
     expect(useGameStore.getState().armScanner('overseer')).toBe('solved')
