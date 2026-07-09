@@ -7,40 +7,63 @@
 
 ---
 
-## 0. Current session handoff (2026-07-08, second session — Phase 2 feature-complete) — READ FIRST
+## 0. Current session handoff (2026-07-09, third session — PHASE 2 GATE CLOSED) — READ FIRST
 
-### Rehydration: read STATUS.md fully (esp. "Phase 2 progress" + the three new
-### Gotchas), the brief, docs/R3F-WEBGPU-NOTES.md, docs/DEVIATIONS.md, and the
-### newest docs/DELTA.md entry (2026-07-08 round 2). Never re-plan from scratch.
+### Rehydration: read STATUS.md fully (esp. the Phase-2 gate-close entries),
+### the brief, docs/R3F-WEBGPU-NOTES.md, docs/DEVIATIONS.md (now D-1..D-6), and
+### the newest docs/DELTA.md entry (2026-07-09). Never re-plan from scratch.
 
 ### Where we are
 
-**Phase 2 is FEATURE-COMPLETE and committed; the gate is NOT closed.** Everything
-in STATUS.md "Phase 2 progress" is tool-verified except the perf floors. What
-remains, in order, on an IDLE machine:
+**Phase 2 is CLOSED (gate-verifier PASS on the second dispatch, 2026-07-09).**
+The next session starts **Phase 3 (xhigh): Puzzle 3 (laser) + full escape** —
+server-raycast validated, win/lose sequences, all-3-roles (2026-07-04
+amendment), reference-delta round, then gate. Carried context:
 
-1. `node tools/verify.mjs --phase 2` (manifest now: lint / vitest / e2e /
-   authority-probe / desktop floors / mobile floors). Desktop fps is the open
-   question: HEAD-vs-tree A/B measured 60 vs 59, then the machine-load window
-   went bad (cheaper configs measured LOWER — 59→56→55 — with a healthy GPU
-   canary; that canary is blind to CPU/compositor contention, see Gotchas).
-   If an idle run still misses 60 by 1: the D-5 knobs already spent this
-   session were scene scale 0.55→0.53 and godrays 10→8; next cheapest are a
-   further scale notch or trimming the reactor-detail instance counts.
-2. Dispatch a fresh-context `gate-verifier`; fix findings; check the Phase-2
-   box in STATUS.md; STOP for handoff (user protocol: fresh window per phase).
+- **D-6 (new deviation):** the P2 arm window is 3.0 s, not the brief's 1.5 s —
+  the USER widened it in playtest commit `9b04c77` (no Claude trailer). Kept
+  deliberately; pinned by literal-value tests in `scannerPuzzle.test.js`. Any
+  timing constant in a spec needs a literal pin test — symbolic-only usage let
+  this drift invisibly through a green 39-test suite.
+- **`tools/pixel-check.mjs` (new):** reproducible luminance-band measurement
+  (Playwright-decoded, Rec.709 linear, `--band`/`--threshold`). ALL future
+  "% below X luminance" claims in DELTA.md must cite it — the round-1 FAIL
+  partly stemmed from irreproducible ad hoc numbers. It is also the named
+  acceptance test for the D-4 GI payback (Phase 5).
+- **Pillar C residual (carried, not blocking):** hero right band 95.9% below
+  the 5%-sRGB bar vs reference 36.8%. Directed-light constants are exhausted
+  (fog color does NOT touch those pixels — nearer than the fog start; magenta
+  wash scores structurally low on Rec.709). The fix is D-4 bounce/GI, Phase 5.
+- **ngrok state is still committed** (server static-serving block +
+  `io(undefined)` in useMultiplayer.js): networked multiplayer under local
+  Vite dev (5173) has no socket path — no proxy exists. Solo mode, e2e, and
+  the authority probe are unaffected. Revert per CLAUDE.md's markers when the
+  user is done with public playtests.
 
 ### What worked / what didn't this session (append to the lists below)
 
+- The user chose gate order up front via one structured question (idle-machine
+  check included) — zero mid-run stalls; every step ended in a commit, so a
+  4-hour-limit cutoff would have lost at most one step.
+- The fresh-context gate-verifier FAILing round 1 was the system working: it
+  caught a user-side spec drift (D-6) the entire green battery could not see,
+  plus an irreproducible-measurement smell. Fixed + re-dispatched same session;
+  round 2 PASSed after independently reproducing the new pixel numbers.
+- Perf lesson repeated: last session's "59/56/55 fps" floor misses were pure
+  machine-load artifacts — the identical tree measured 60 first-try on an idle
+  machine. Never spend D-5 knobs on numbers from a contended window.
+
+### Previous session's notes (2026-07-08, Phase 2 feature-complete)
+
 - Fan-out worked: server track (chain + authority probe, sonnet subagent) and
-  client track (this session inline) built against a shared contract module
+  client track (that session inline) built against a shared contract module
   written FIRST (`shared/scannerPuzzle.js`) — zero integration friction.
 - The delta-round subagent hit the spend limit mid-optimization; its visual
   work was sound but its fps re-bisect had to be finished inline. Its first
   draft cost 9 fps (fractal grime / FogExp2 / 360 additive motes) — costs and
   cheap replacements are documented in DELTA.md round 2's perf note.
 - Do NOT trust perf numbers from a window where cheaper configs measure lower
-  (see the canary-blind-spot gotcha in STATUS.md). Late-session numbers here
+  (see the canary-blind-spot gotcha in STATUS.md). Late-session numbers there
   were invalid; nothing was concluded from them.
 
 # Previous session handoff (2026-07-08, Phase-1 close) — kept for its lessons
@@ -111,7 +134,7 @@ reference-delta, and a fresh-context `gate-verifier` agent dispatch. User protoc
 ### Next steps (Phase 2 — fresh session starts here)
 
 1. **Puzzle 2 — Tri-Vector Hand Scanners** (brief §3.14): 3-role simultaneous arm
-   within a 1.5 s rolling window; each scanner LATCHES armed a few seconds so
+   within a rolling window (spec 1.5 s; shipped 3.0 s per D-6 user playtest tuning); each scanner LATCHES armed a few seconds so
    solo-swap solves the identical puzzle across swaps; failure → lockout cooldown.
    Server-side 1→2 chain; Pillar-A test proving 2 roles cannot complete it.
 2. **Pillar-D server-authority probe** (verifier rubric D=4): scripted client emits a

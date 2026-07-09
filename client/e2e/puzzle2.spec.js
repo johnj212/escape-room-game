@@ -4,7 +4,8 @@ import { test, expect } from '@playwright/test'
 // local run of the SAME shared/scannerPuzzle.js machine the server executes.
 //
 // Puzzle 2 (Tri-Vector Hand Scanners, brief §3.14): all three role-keyed
-// scanners must be armed within a 1.5 s rolling window; each scanner latches
+// scanners must be armed within a 3.0 s rolling window (spec said 1.5 s — D-6,
+// user playtest widening); each scanner latches
 // armed for a few seconds (that latch is what lets a solo player carry an
 // armed state across character swaps); failure → lockout cooldown. The
 // e2e proves the IDENTICAL puzzle solves via solo-swap: each character is
@@ -80,7 +81,7 @@ async function positionAllAtScanners(page) {
 }
 
 // Swap-arm burst: 1-E, 2-E, 3-E — six keystrokes, normally well inside the
-// 1.5 s rolling window. On a heavily loaded machine the CDP round-trips can
+// 3.0 s rolling window (D-6). On a heavily loaded machine the CDP round-trips can
 // stretch past the window, which the machine CORRECTLY fails into lockout —
 // so do what a human does: wait out the cooldown and try again (bounded).
 // This retries the identical mechanic; it never relaxes it.
