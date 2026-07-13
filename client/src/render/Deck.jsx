@@ -197,6 +197,156 @@ function buildGreebles(seed) {
   return out
 }
 
+// Wall machinery: conduit boxes, junction panels (frame + recessed body),
+// breaker cabinets (body + recessed inset face), short pipe stubs, and small
+// emissive indicator lights — reference-delta gap #5 ("wall machinery
+// density"). Mounted only on the two side walls (x=±10, Engineer/Technician
+// sectors) and the back wall (z=-10) outside the reactor's |x|<3 centre
+// strip; the front wall (z=+10) is camera-facing/invisible and stays clear.
+// Every piece stays within ~0.65 m of its wall face (mount rule) and reuses
+// the same rotate-by-wall-yaw convention as buildGreebles/buildWalls so it
+// inherits their per-wall depth-sign handling.
+function buildMachinery(seed) {
+  const { half } = ROOM
+  const rng = streamFor(seed, 'machinery')
+  // Depths are based on the PANEL front face, not the collider face: the wall
+  // panelling (buildWalls) sits at inset 0.28 with 0.1-thick panels, so any
+  // piece based shallower than 0.33 is buried inside/behind the panels — the
+  // first draft mounted everything at 0.05–0.29 and rendered invisible.
+  const FACE = 0.33
+  const walls = [
+    { o: [0, 0, -half], along: 'x', yaw: 0 },
+    { o: [-half, 0, 0], along: 'z', yaw: Math.PI / 2 },
+    { o: [half, 0, 0], along: 'z', yaw: -Math.PI / 2 },
+  ]
+  const sign = (w) => (w.o[2] < 0 || w.o[0] < 0 ? 1 : -1)
+  const pos = (w, a, y, depth) => {
+    const d = sign(w) * depth
+    return w.along === 'x' ? [a, y, w.o[2] + d] : [w.o[0] + d, y, a]
+  }
+  // Reject samples inside the back wall's reactor centre strip (|x| < 3,
+  // padded to 3.4 so box footprints never clip the reactor group).
+  const sampleA = (w) => {
+    let a
+    do {
+      a = -half + 0.6 + rng() * (half * 2 - 1.2)
+    } while (w.along === 'x' && Math.abs(a) < 3.4)
+    return a
+  }
+
+  const conduitBoxes = []
+  const junctionFrames = []
+  const junctionBodies = []
+  const cabinetBodies = []
+  const cabinetInsets = []
+  const pipeStubs = []
+  const indicators = { cyan: [], amber: [], red: [] }
+
+  for (const w of walls) {
+    // Conduit boxes: varied-size clutter, the reference's dominant motif.
+    for (let i = 0; i < 234; i++) {
+      const a = sampleA(w)
+      const y = 0.4 + rng() * 6.2
+      const bw = 0.25 + rng() * 0.65
+      const bh = 0.2 + rng() * 0.5
+      const bd = 0.08 + rng() * 0.22
+      const depth = FACE - 0.02 + bd / 2
+      conduitBoxes.push({ position: pos(w, a, y, depth), rotation: [0, w.yaw, 0], scale: [bw, bh, bd] })
+      // ~1 in 3 boxes carries a status lamp ON its front face — free-floating
+      // lamps read as confetti in the dark, attached ones read as machinery.
+      if (rng() < 0.35) {
+        const s = 0.8 + rng() * 0.5
+        const item = {
+          position: pos(w, a + (rng() - 0.5) * bw * 0.5, y + (rng() - 0.5) * bh * 0.5, depth + bd / 2 + 0.015),
+          rotation: [0, w.yaw, 0],
+          scale: [s, s, s],
+        }
+        const r = rng()
+        if (r < 0.4) indicators.cyan.push(item)
+        else if (r < 0.7) indicators.amber.push(item)
+        else indicators.red.push(item)
+      }
+    }
+
+    // Junction panels: thin raised frame (wider, wall-flush) behind a
+    // smaller recessed body — reads as a panel with a visible rim.
+    for (let i = 0; i < 87; i++) {
+      const a = sampleA(w)
+      const y = 0.4 + rng() * 6.2
+      const bw = 0.4 + rng() * 0.4
+      const bh = 0.4 + rng() * 0.4
+      const baseDepth = FACE + 0.005 + rng() * 0.02
+      const frameThickness = 0.025
+      const bodyThickness = 0.06 + rng() * 0.05
+      const bodyDepth = baseDepth + frameThickness / 2 + bodyThickness / 2
+      junctionFrames.push({
+        position: pos(w, a, y, baseDepth),
+        rotation: [0, w.yaw, 0],
+        scale: [bw + 0.08, bh + 0.08, frameThickness],
+      })
+      junctionBodies.push({
+        position: pos(w, a, y, bodyDepth),
+        rotation: [0, w.yaw, 0],
+        scale: [bw, bh, bodyThickness],
+      })
+      if (rng() < 0.45) {
+        const s = 0.8 + rng() * 0.4
+        const item = {
+          position: pos(w, a + (rng() - 0.5) * bw * 0.6, y + bh * 0.32, bodyDepth + bodyThickness / 2 + 0.015),
+          rotation: [0, w.yaw, 0],
+          scale: [s, s, s],
+        }
+        const r = rng()
+        if (r < 0.5) indicators.cyan.push(item)
+        else if (r < 0.8) indicators.amber.push(item)
+        else indicators.red.push(item)
+      }
+    }
+
+    // Breaker cabinets: occasional, taller boxes with a recessed front face.
+    for (let i = 0; i < 10; i++) {
+      const a = sampleA(w)
+      const ch = 1.0 + rng() * 0.8
+      const y = 0.3 + ch / 2 + rng() * 1.4
+      const cw = 0.5 + rng() * 0.4
+      const ct = 0.18 + rng() * 0.1
+      const depth = FACE - 0.02 + ct / 2
+      cabinetBodies.push({ position: pos(w, a, y, depth), rotation: [0, w.yaw, 0], scale: [cw, ch, ct] })
+      cabinetInsets.push({
+        position: pos(w, a, y, depth - ct * 0.15),
+        rotation: [0, w.yaw, 0],
+        scale: [cw * 0.7, ch * 0.75, ct * 0.4],
+      })
+      // Vertical status-lamp pair beside the recessed face.
+      for (const dy of [-0.12, 0.12]) {
+        const item = {
+          position: pos(w, a + cw * 0.28, y + dy, depth + ct / 2 + 0.015),
+          rotation: [0, w.yaw, 0],
+          scale: [1, 1, 1],
+        }
+        const r = rng()
+        if (r < 0.34) indicators.cyan.push(item)
+        else if (r < 0.67) indicators.amber.push(item)
+        else indicators.red.push(item)
+      }
+    }
+
+    // Short conduit pipe stubs poking out of the wall, tying boxes together.
+    const stubRotation = w.along === 'x' ? [Math.PI / 2, 0, 0] : [0, 0, Math.PI / 2]
+    for (let i = 0; i < 107; i++) {
+      const a = sampleA(w)
+      const y = 0.4 + rng() * 6.2
+      const len = 0.14 + rng() * 0.16
+      pipeStubs.push({ position: pos(w, a, y, FACE - 0.02 + len / 2), rotation: stubRotation, scale: [1, len, 1] })
+    }
+
+    // (All indicators are attached to their box/panel/cabinet at creation —
+    // no free-floating lamps: unanchored they read as confetti, not gear.)
+  }
+
+  return { conduitBoxes, junctionFrames, junctionBodies, cabinetBodies, cabinetInsets, pipeStubs, indicators }
+}
+
 function buildCeiling(seed) {
   const { half } = ROOM
   const rng = streamFor(seed, 'ceiling')
@@ -260,6 +410,7 @@ export const Deck = () => {
       walls: buildWalls(seed),
       pipes: buildPipes(seed),
       greebles: buildGreebles(seed),
+      machinery: buildMachinery(seed),
       ceiling: buildCeiling(seed),
       motes: buildMotes(seed),
     }),
@@ -295,6 +446,10 @@ export const Deck = () => {
       pipe: new THREE.CylinderGeometry(0.055, 0.055, 1, 20, 1, true),
       joint: new THREE.SphereGeometry(0.085, 18, 14),
       greeble: new THREE.BoxGeometry(1, 1, 1),
+      // Wall machinery (gap #5): boxes/frames/bodies/insets all reuse the
+      // unit box above (varied per-instance via `scale`); pipe stubs reuse
+      // `pipe`. Only the indicator lens needs its own tiny geometry.
+      indicator: new THREE.BoxGeometry(0.05, 0.05, 0.02),
       beam: new THREE.BoxGeometry(1, 0.22, 0.5),
       conduit: new THREE.CylinderGeometry(0.03, 0.03, ROOM.half * 2, 16),
       reactorBase: new THREE.CylinderGeometry(2.3, 2.55, 0.6, 96),
@@ -333,6 +488,15 @@ export const Deck = () => {
       cyan: neonMaterial({ tint: '#00f3ff', intensity: 2.4 }),
       magenta: neonMaterial({ tint: '#ff007f', intensity: 2.4 }),
       violet: neonMaterial({ tint: '#7f8fff', intensity: 1.8, flicker: 0.05 }),
+      // Wall machinery (gap #5): body/frame tones distinct from `dark`
+      // (ribs/rails) so the new clutter reads as its own layer, plus a
+      // small emissive indicator palette (cyan reuses the existing tint).
+      // Lighter than the wall alloy (#242c3a) so the clutter separates from
+      // the wall it hangs on — at #1c2330 it silhouetted and disappeared.
+      machine: structuralMetalMaterial({ tone: '#39455e' }),
+      machineDark: structuralMetalMaterial({ tone: '#202839' }),
+      amber: neonMaterial({ tint: '#ffaa33', intensity: 1.6, flicker: 0.12 }),
+      red: neonMaterial({ tint: '#ff3b30', intensity: 1.6, flicker: 0.15 }),
       core: reactorCoreMaterial(),
       glass: containmentGlassMaterial(),
       motes: motesMaterial(),
@@ -384,6 +548,20 @@ export const Deck = () => {
 
       {/* Greeble field */}
       <Instances geometry={geo.greeble} material={mat.dark} transforms={layout.greebles} />
+
+      {/* Wall machinery (delta gap #5): conduit boxes, junction panels,
+          breaker cabinets, pipe stubs, indicator lights on the side + back
+          walls (mount rules: within ~0.55 m of wall face, clear of the
+          reactor's back-wall centre strip, no shadow casting). */}
+      <Instances geometry={geo.greeble} material={mat.machine} transforms={layout.machinery.conduitBoxes} />
+      <Instances geometry={geo.greeble} material={mat.machineDark} transforms={layout.machinery.junctionFrames} />
+      <Instances geometry={geo.greeble} material={mat.machine} transforms={layout.machinery.junctionBodies} />
+      <Instances geometry={geo.greeble} material={mat.machine} transforms={layout.machinery.cabinetBodies} />
+      <Instances geometry={geo.greeble} material={mat.machineDark} transforms={layout.machinery.cabinetInsets} />
+      <Instances geometry={geo.pipe} material={mat.structural} transforms={layout.machinery.pipeStubs} />
+      <Instances geometry={geo.indicator} material={mat.cyan} transforms={layout.machinery.indicators.cyan} />
+      <Instances geometry={geo.indicator} material={mat.amber} transforms={layout.machinery.indicators.amber} />
+      <Instances geometry={geo.indicator} material={mat.red} transforms={layout.machinery.indicators.red} />
 
       {/* Ceiling trusses + cross beams + conduits + cables */}
       <Instances geometry={geo.beam} material={mat.structural} transforms={layout.ceiling.beams} castShadow />

@@ -143,6 +143,22 @@ function EmitterStation({ p3, access, now }) {
             roughness={0.2}
           />
         </mesh>
+        {/* Housing detail: cooling fins + a conduit stub + breaker box
+            (delta round 3 #2 — the array is hero geometry, §4) */}
+        {[-0.32, 0.32].map((x) => (
+          <mesh key={x} castShadow position={[x, -0.18, 0]}>
+            <boxGeometry args={[0.08, 0.3, 0.5]} />
+            <meshStandardMaterial color="#10141d" roughness={0.4} metalness={0.85} />
+          </mesh>
+        ))}
+        <mesh receiveShadow position={[0, -0.45, -0.42]}>
+          <boxGeometry args={[0.34, 0.26, 0.18]} />
+          <meshStandardMaterial color="#1a2230" roughness={0.5} metalness={0.75} />
+        </mesh>
+        <mesh position={[0, -0.28, -0.4]} rotation={[Math.PI / 4, 0, 0]}>
+          <cylinderGeometry args={[0.035, 0.035, 0.32, 6]} />
+          <meshStandardMaterial color="#12161f" roughness={0.5} metalness={0.8} />
+        </mesh>
         {/* Gimballed barrel — the piece that visibly yaws with emitterStep */}
         <group ref={barrelRef} position={[0, 0.05, 0]}>
           <mesh castShadow position={[0.4, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
@@ -207,6 +223,9 @@ function MirrorStation({ index, pos, p3, access, now }) {
     // becomes the mirror's reflective face tangent (cos a, sin a).
     if (group) group.rotation.y = -angle
 
+    // State feedback lives on the glow FRAME around the face, not the face
+    // itself: a full-face emissive read as a flat unlit slab in the hero
+    // frame (delta round 3 #2) — the face is now a real mirror surface.
     const panel = panelRef.current?.material
     if (!panel) return
     const t = state.clock.getElapsedTime()
@@ -230,16 +249,46 @@ function MirrorStation({ index, pos, p3, access, now }) {
           <cylinderGeometry args={[0.2, 0.26, 0.45, 8]} />
           <meshStandardMaterial color="#12161f" roughness={0.5} metalness={0.75} />
         </mesh>
+        {/* Yoke column: pedestal → gimbal (the slab used to float) */}
+        <mesh receiveShadow position={[0, -0.32, 0]}>
+          <boxGeometry args={[0.14, 0.55, 0.14]} />
+          <meshStandardMaterial color="#1a2230" roughness={0.45} metalness={0.8} />
+        </mesh>
         <group ref={groupRef}>
-          <mesh ref={panelRef} castShadow>
-            <boxGeometry args={[MIRROR_WIDTH, 0.5, 0.05]} />
+          {/* Reflective face: bright metal, barely-there emissive */}
+          <mesh castShadow>
+            <boxGeometry args={[MIRROR_WIDTH, 0.5, 0.03]} />
             <meshStandardMaterial
               color="#dfe8f2"
+              emissive="#5fd0ff"
+              emissiveIntensity={0.15}
+              roughness={0.05}
+              metalness={0.98}
+            />
+          </mesh>
+          {/* Glow frame behind the face — carries the animated state light */}
+          <mesh ref={panelRef} position={[0, 0, -0.025]}>
+            <boxGeometry args={[MIRROR_WIDTH + 0.09, 0.59, 0.02]} />
+            <meshStandardMaterial
+              color="#10141d"
               emissive={lockedOut ? '#ff3131' : '#5fd0ff'}
               emissiveIntensity={1}
-              roughness={0.06}
-              metalness={0.95}
+              roughness={0.3}
+              metalness={0.6}
             />
+          </mesh>
+          {/* Back armature: spine rib + two mount brackets */}
+          <mesh castShadow position={[0, 0, -0.07]}>
+            <boxGeometry args={[0.12, 0.62, 0.06]} />
+            <meshStandardMaterial color="#12161f" roughness={0.5} metalness={0.8} />
+          </mesh>
+          <mesh position={[-MIRROR_WIDTH / 2 + 0.06, 0, -0.055]}>
+            <boxGeometry args={[0.05, 0.56, 0.05]} />
+            <meshStandardMaterial color="#1a2230" roughness={0.45} metalness={0.8} />
+          </mesh>
+          <mesh position={[MIRROR_WIDTH / 2 - 0.06, 0, -0.055]}>
+            <boxGeometry args={[0.05, 0.56, 0.05]} />
+            <meshStandardMaterial color="#1a2230" roughness={0.45} metalness={0.8} />
           </mesh>
         </group>
       </RigidBody>
@@ -331,6 +380,22 @@ function ReceiverStation({ p3, access, now, onOpen }) {
         <mesh ref={irisRef} rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.01]}>
           <circleGeometry args={[RECEIVER_RADIUS, 16]} />
           <meshStandardMaterial color="#181d26" roughness={0.5} metalness={0.6} side={THREE.DoubleSide} />
+        </mesh>
+        {/* Housing detail: four brace struts radiating in the ring's own
+            (horizontal) plane + a sensor pod at the base (delta round 3 #2) */}
+        {[45, 135, 225, 315].map((deg) => {
+          const a = (deg * Math.PI) / 180
+          const r = RECEIVER_RADIUS + 0.3
+          return (
+            <mesh key={deg} castShadow position={[Math.cos(a) * r, 0, Math.sin(a) * r]} rotation={[0, -a, 0]}>
+              <boxGeometry args={[0.36, 0.09, 0.07]} />
+              <meshStandardMaterial color="#12161f" roughness={0.45} metalness={0.85} />
+            </mesh>
+          )
+        })}
+        <mesh receiveShadow position={[0, -0.55, 0]}>
+          <boxGeometry args={[0.3, 0.34, 0.2]} />
+          <meshStandardMaterial color="#1a2230" roughness={0.5} metalness={0.75} />
         </mesh>
       </RigidBody>
 

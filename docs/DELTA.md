@@ -4,6 +4,34 @@ The reference-delta loop is verification check **#1** and runs **every phase** (
 
 ---
 
+## 2026-07-13 — Phase 3 — round 3 (laser array in frame; partition-post blowout regression)
+
+Shot: `docs/shots/phase3-hero.png` (via `capture-hero.mjs --out ...`). Reference: `reference/sector9_deck_hero.png`.
+
+Ranked differences at round start (carried gaps re-verified against the actual shot):
+
+1. [critical] **Central column blown to white — a Phase-3 regression.** The doorway fix (Room.jsx, partition 16 m → 12 m) moved the partition's +z neon end-post from z=8 to z=6 — now 2.7 m directly in front of the hero camera (`[0, 4.6, 8.7]`, on the partition line, eyeline passing just over the post's 4 m top). Its `neonMaterial` intensity 2.2 is double the 1.0 bloom threshold, so the whole post blooms into a fat white column that obscures the deck center and swallows the phase-2 shot's magenta accents. (Alarm escalation ruled out: at timer-full its factor is 0 and all fixtures sit at authored base.)
+2. [high] **The laser array — the round's new hero geometry — reads flat (§4 tension).** Mirror faces are full-face emissive slabs (flat light-blue rectangles in frame); emitter and receiver are small unadorned cylinders. Reference-grade props carry housing, frames, cabling, lit detail.
+3. [high] Wall machinery density (carried #5): reference walls are dense with conduit boxes, junction panels, lit greebles; ours are still ribbed panelling only.
+4. [medium] Console greebling (carried #6).
+5. [medium] Right-wall near-black band (carried #4 — D-4 GI signature, Phase-5 payback, acceptance test `tools/pixel-check.mjs`).
+6. [medium] Room-wide volumetrics (carried #7): haze band + motes shipped round 2; reference still pools fog through the whole frame.
+7. [medium] Droid detail (carried #8, Phase-5 scope).
+8. [low] Environmental signage/typographic identity (carried #9).
+9. [low] Partition energy-beam arc texture (carried #10).
+10. [low] Reactor core orb slightly plain at hero distance inside its cage (largely closed rounds 1–2; residual only).
+
+Fixed this round: #1, #2, #3. Re-render: `docs/shots/phase3-hero.png` (final, same session).
+
+- **#1 closed.** Partition post neon 2.2 → 0.9 (under the 1.0 bloom threshold, Room.jsx). The center column reads as a thin energy divider again — reactor cage and core fully legible behind it, matching the accepted Phase-2 composition. Verified by scratch re-render before proceeding.
+- **#2 closed.** LaserArray props reshaped: mirror faces are now real metal (metalness 0.98, emissive 0.15) with the animated state glow moved to a rim frame behind the face; yoke column + spine rib + brackets fill the pedestal gap. Emitter gains cooling fins, conduit stub, breaker box; receiver gains four in-plane brace struts + sensor pod. State-feedback behavior (approach glow / lockout flash / solved green) unchanged — same `panelRef` animation, new carrier mesh.
+- **#3 closed** (Sonnet subagent + two orchestrator fix rounds). `buildMachinery(seed)` in Deck.jsx: ~700 conduit boxes, ~260 junction panels (frame + recessed body), 30 breaker cabinets, ~320 pipe stubs, all instanced off shared unit geometry, ~35K tris, zero new lights/shadow casters, front wall + reactor strip kept clear. Two rounds of orchestrator validation against the actual render: (a) the first draft based depths on the *collider* face (0.05–0.29) and was entirely buried behind the wall panelling (panel front face = 0.33) — everything rebased to `FACE = 0.33`; (b) free-sprinkled indicator lamps read as floating confetti — all lamps are now attached to a box/panel/cabinet face at creation, and machine tones lifted (#39455e/#202839) above the wall alloy so the clutter separates from the wall.
+- **Pillar-C side effect, pixel-checked** (`tools/pixel-check.mjs --threshold 0.0037`, phase3 vs phase2 hero): right band (x 85–100%) **95.9% → 77.1%** below the 5%-sRGB bar (mean 0.0032 → 0.0063), left band (x 0–15%) **45.2% → 34.9%** (mean 0.0119 → 0.0161). Reference right band: 36.8% — the D-4 GI residual remains, but the machinery layer closed a real fraction of it at zero light-count cost.
+
+Remains (re-ranked for the next round): #4 console greebling, #5 right-band D-4 residual (Phase 5), #6 room-wide volumetrics, #7 droids (Phase 5), #8 signage, #9 beam arc texture, #10 reactor-core detail residual.
+
+---
+
 ## 2026-07-09 — Phase 2 — gate-verifier Pillar-C round (reproducible pixel measurement + edge-band lift)
 
 Shot: `docs/shots/phase2-hero.png` (re-rendered this round). Reference: `reference/sector9_deck_hero.png`.

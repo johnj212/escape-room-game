@@ -15,7 +15,10 @@ export const Room = () => {
     () => containmentGlassMaterial({ tint: '#2ec8e6', opacity: 0.22 }),
     []
   )
-  const postMat = useMemo(() => neonMaterial({ tint: '#00f3ff', intensity: 2.2 }), [])
+  // 0.9: under the bloom threshold (1.0). Since the doorway fix the +z post
+  // stands 2.7 m in front of the hero camera — at 2.2 it bloomed into a
+  // frame-wide white column that obscured the deck center (delta round 3 #1).
+  const postMat = useMemo(() => neonMaterial({ tint: '#00f3ff', intensity: 0.9 }), [])
 
   useLayoutEffect(() => {
     return () => {
