@@ -240,22 +240,35 @@ keyboard, making P3 unsolvable.**
     verified against `activePlayerId`), and **an idle teammate is a solid
     capsule** that will block the doorway (teammates are now obstacles).
 
-### Next session starts here (Phase 3 gate)
+### Phase-3 gate session (2026-07-13) — delta round 3 + battery PASS
 
-Phase 3 is feature-complete. What remains is all GPU-serial and needs an
-**idle machine** (a contended window has produced invalid fps twice; never
-spend D-5 knobs on numbers from one):
-
-1. **Reference-delta round 3** — `npm run capture --out docs/shots/phase3-hero.png`,
-   rank the ten gaps in `docs/DELTA.md`, fix the top three, re-render. DELTA
-   #5/#6 (wall machinery density, console greebling) are the carried
-   next-cheapest wins. The laser array is new geometry in the frame — grade it.
-2. **`node tools/verify.mjs --phase 3`** — the battery. Watch the **bundle**: it
-   is at 495.0 KB of a 500 KiB floor (~5 KB headroom), and `LaserArray.jsx` +
-   `EndgameSequence.jsx` are what consumed it. The next feature that adds a
-   dependency will breach it.
+1. **Reference-delta round 3 COMPLETE** (`docs/DELTA.md` 2026-07-13, commit
+   `06d67ab`): top-3 fixed and verified by re-render — (a) partition-post bloom
+   blowout **regression** (the doorway fix put the +z post 2.7 m in front of
+   the hero camera at neon 2.2; → 0.9, under the bloom threshold), (b) laser
+   props reshaped (real mirror faces + rim-frame state glow, emitter/receiver
+   housing — §4), (c) DELTA #5 wall machinery shipped (~35K instanced tris,
+   Sonnet subagent + two orchestrator fix rounds: depths were based on the
+   collider face and buried behind the panelling; lamps were free-floating
+   confetti — both caught by validating the actual render). Pillar-C bonus,
+   pixel-checked: right band 95.9→77.1% <5%-sRGB, left 45.2→34.9%.
+2. **Battery `--phase 3`: 6/6 HARD PASS** (2026-07-13, idle machine, attempt 3;
+   a `--phase 3` manifest had to be added to `verify.mjs` first — Phase 3 had
+   never wired one). Desktop **60 fps / 2.08M tris / 545 draws, canary 60
+   (healthy), warmup 20.1s**; mobile **60 fps / 1.94M tris**; bundle
+   **496.1 KB / 500 KiB (~4 KB headroom — round 3 cost 1.1 KB)**.
+   Attempts 1–2 failed in the puzzle3 e2e and exposed three real walker-model
+   bugs (fixed in `55d7ae9` + the BFS commit): teammates were goal-exempt in
+   `blocked()` (walker drove INTO the Overseer's idle capsule 0.78 m from the
+   left doorway waypoint); prop radii were ~half the real collider footprints
+   (console 1.7 m base modeled at r 0.4 — physical wedge the probes called
+   free); and the myopic greedy structurally cannot round a large keep-out.
+   The walker now plans with a 0.4 m grid-BFS (`planPath`) over the same
+   `blocked()` model and follows decimated waypoints — suite ~3× faster.
+   The escape run also parks the Overseer clear of the doorway first (an idle
+   teammate is a solid capsule — the standing gotcha, now load-bearing).
 3. **gate-verifier dispatch** → fix findings → re-dispatch until PASS → close
-   the gate → STOP for handoff.
+   the gate → STOP for handoff. ← NEXT
 
 Carried: the EnvironmentProbe D-4 debugging round when the fps budget allows;
 Pillar-C residual under D-4 (acceptance test `tools/pixel-check.mjs`).
