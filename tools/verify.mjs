@@ -347,10 +347,21 @@ function phase2Manifest() {
   ]
 }
 
+// Phase 3 battery: identical shape to Phase 2 — the authority probe now carries
+// 14 assertions (fabricated P3 events, stage gating, wrong-role/out-of-range
+// laser actions, the full legal 1→2→3 escape, and the no-solution-in-broadcast
+// deep check), and the e2e suite includes puzzle3.spec.js (full escape +
+// misfire lockout). No new check *kinds*: P3's server raycast is exercised by
+// the same probe + e2e pair.
+function phase3Manifest() {
+  return phase2Manifest()
+}
+
 const MANIFESTS = {
   0: phase0Manifest,
   1: phase1Manifest,
   2: phase2Manifest,
+  3: phase3Manifest,
 }
 
 // ---------------------------------------------------------------------------

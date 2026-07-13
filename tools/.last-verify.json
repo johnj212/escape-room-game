@@ -1,9 +1,9 @@
 {
-  "phase": 2,
-  "timestamp": "2026-07-09T05:24:56.619Z",
-  "overallPass": true,
+  "phase": 3,
+  "timestamp": "2026-07-13T05:35:01.321Z",
+  "overallPass": false,
   "hardTotal": 6,
-  "hardPassed": 6,
+  "hardPassed": 5,
   "checks": [
     {
       "id": 1,
@@ -11,7 +11,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 746,
+      "durationMs": 859,
       "note": "0 warnings/errors"
     },
     {
@@ -20,17 +20,17 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 770,
+      "durationMs": 935,
       "note": "all specs passed"
     },
     {
       "id": 3,
       "name": "E2E (playwright)",
       "hard": true,
-      "pass": true,
-      "status": "PASS",
-      "durationMs": 32686,
-      "note": "e2e suite green"
+      "pass": false,
+      "status": "FAIL",
+      "durationMs": 265658,
+      "note": "\n> escape-room-client@1.0.0 e2e\n> playwright test\n\n\nRunning 8 tests using 1 worker\n\n  ✓  1 [chromium] › e2e/puzzle1-mobile.spec.js:29:3 › Mobile USE button — switchboard terminal (Puzzle 1) › tapping the on-screen USE button opens the terminal like desktop Space/E (3.6s)\n  ✓  2 [chromium] › e2e/puzzle1.spec.js:28:3 › WebGPU harness capability (forward-looking, Phase 1 prep) › Playwright-controlled Chromium acquires a real, non-null WebGPU adapter (407ms)\n  ✓  3 [chromium] › e2e/puzzle1.spec.js:54:3 › App boot + solo-swap solve of Puzzle 1 (Decoupled Power Grid) › boots without errors, mounts a live render context, and solves P1 via character-swap (2.4s)\n  ✓  4 [chromium] › e2e/puzzle2.spec.js:120:3 › Puzzle 2 — Tri-Vector Hand Scanners (1 → 2 chain, solo-swap) › solo-swap completes the full 1 → 2 chain: swap-arm all three scanners inside the window → win (6.3s)\n  ✓  5 [chromium] › e2e/puzzle2.spec.js:157:3 › Puzzle 2 — Tri-Vector Hand Scanners (1 → 2 chain, solo-swap) › an incomplete arm attempt fails into lockout, rejects arming, then recovers (16.1s)\n  ✘  6 [chromium] › e2e/puzzle3.spec.js:356:3 › Puzzle 3 — Laser Deflection Array (full 1 → 2 → 3 escape, solo-swap) › solo-swap completes the full escape: all three roles act, the beam lands, phase → win (2.6m)\n  ✓  7 [chromium] › e2e/puzzle3.spec.js:430:3 › Puzzle 3 — Laser Deflection Array (full 1 → 2 → 3 escape, solo-swap) › an aligned beam on a sealed aperture misfires into lockout, rejects input, then recovers (1.2m)\n  ✓  8 [chromium-no-webgpu] › e2e/capability.spec.js:16:3 › Capability gate — forced non-WebGPU context › renders the designed unsupported screen with zero console exceptions (467ms)\n\n\n  1) [chromium] › e2e/puzzle3.spec.js:356:3 › Puzzle 3 — Laser Deflection Array (full 1 → 2 → 3 escape, solo-swap) › solo-swap completes the full escape: all three roles act, the beam lands, phase → win \n\n    Error: player-2: could not reach [-2.2,7.4] — stopped at [-0.82, 7.21], dist 1.40\n      active=player-2 players={\"player-1\":[-7.28,-4.72],\"player-2\":[-0.82,7.21],\"player-3\":[-1.41,7.14]} mirrors=[[-3.75,6.42],[2.08,0.77],[-1.44,-5.71]]\n\n      159 |         }\n      160 |       })\n    > 161 |       throw new Error(\n          |             ^\n      162 |         `${playerId}: could not reach [${goal}] — stopped at [${pos[0].toFixed(2)}, ${pos[1].toFixed(2)}], dist ${dist.toFixed(2)}\\n` +\n      163 |           `  active=${ctx.active} players=${JSON.stringify(ctx.players)} mirrors=${JSON.stringify(ctx.mirrors)}`\n      164 |       )\n        at greedyWalk (/Users/johnmather/coding/Anti/escape room game/client/e2e/puzzle3.spec.js:161:13)\n        at walkTo (/Users/johnmather/coding/Anti/escape room game/client/e2e/puzzle3.spec.js:219:5)\n        at /Users/johnmather/coding/Anti/escape room game/client/e2e/puzzle3.spec.js:393:7\n\n    attachment #1: video (video/webm) ──────────────────────────────────────────────────────────────\n    test-results/puzzle3-Puzzle-3-—-Laser-D-41559--the-beam-lands-phase-→-win-chromium/video.webm\n    ────────────────────────────────────────────────────────────────────────────────────────────────\n\n    Error Context: test-results/puzzle3-Puzzle-3-—-Laser-D-41559--the-beam-lands-phase-→-win-chromium/error-context.md\n\n    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────\n    test-results/puzzle3-Puzzle-3-—-Laser-D-41559--the-beam-lands-phase-→-win-chromium/trace.zip\n    Usage:\n\n        npx playwright show-trace test-results/puzzle3-Puzzle-3-—-Laser-D-41559--the-beam-lands-phase-→-win-chromium/trace.zip\n\n    ────────────────────────────────────────────────────────────────────────────────────────────────\n\n  1 failed\n    [chromium] › e2e/puzzle3.spec.js:356:3 › Puzzle 3 — Laser Deflection Array (full 1 → 2 → 3 escape, solo-swap) › solo-swap completes the full escape: all three roles act, the beam lands, phase → win \n  7 passed (4.4m)\n"
     },
     {
       "id": 4,
@@ -38,7 +38,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 12822,
+      "durationMs": 23944,
       "note": "all authority assertions passed"
     },
     {
@@ -47,7 +47,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 65238,
+      "durationMs": 66049,
       "note": "§2 desktop floors met"
     },
     {
@@ -56,7 +56,7 @@
       "hard": true,
       "pass": true,
       "status": "PASS",
-      "durationMs": 65588,
+      "durationMs": 65342,
       "note": "§2 mobile floors met"
     }
   ]

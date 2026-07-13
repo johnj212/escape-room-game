@@ -108,19 +108,23 @@ async function obstacles(page, playerId) {
   }, playerId)
   return [
     ...props.map((pos) => ({ pos, r: PROP_RADIUS })),
-    ...others.map((pos) => ({ pos, r: PLAYER_RADIUS })),
+    ...others.map((pos) => ({ pos, r: PLAYER_RADIUS, player: true })),
     { pos: REACTOR.pos, r: REACTOR.r },
   ]
 }
 
 // A candidate point is blocked by a prop, a wall, or the partition pane.
-// Obstacles at the goal are ignored: the goal IS a prop, and the character has
-// to be allowed to walk up to it.
+// PROP obstacles at the goal are ignored: the goal IS a prop, and the
+// character has to be allowed to walk up to it. A TEAMMATE near the goal is
+// never exempt — it is an immovable capsule, not the thing being walked to.
+// (The left bypass waypoint sits 0.78 m from the Overseer's idle spawn; the
+// old unconditional exemption made the walker drive straight INTO that capsule
+// instead of routing around it, and the full-escape run deadlocked there.)
 function blocked([x, z], obs, goal) {
   if (Math.abs(x) > WALL || Math.abs(z) > WALL) return true
   if (Math.abs(x) < PARTITION_CLEAR && Math.abs(z) < PARTITION_END) return true
-  return obs.some(({ pos: [ox, oz], r }) => {
-    if (Math.hypot(ox - goal[0], oz - goal[1]) < 1.0) return false // the goal itself
+  return obs.some(({ pos: [ox, oz], r, player }) => {
+    if (!player && Math.hypot(ox - goal[0], oz - goal[1]) < 1.0) return false // the goal itself
     return Math.hypot(x - ox, z - oz) < r + CAPSULE
   })
 }
@@ -371,6 +375,17 @@ test.describe('Puzzle 3 — Laser Deflection Array (full 1 → 2 → 3 escape, s
     // server uses. The RUN below only ever emits legal role actions.
     const { solution } = createLaserLayout(SEED)
     const stations = await page.evaluate(() => window.__LASER_STATIONS__)
+
+    // --- Park the OVERSEER clear of the doorway first. Its spawn sits 0.78 m
+    // from the left bypass waypoint, and an idle teammate is a solid capsule
+    // (STATUS.md gotcha): left there, it walls off the deck's only crossing
+    // and the Technician's mirror runs deadlock in the pocket between its
+    // keep-out ring and the partition margin — a slalom the myopic greedy
+    // walker cannot discover. Real crews do exactly this ("clear the door!"),
+    // and parking on the RIGHT also pre-positions the Overseer on the
+    // receiver's side of the partition for its own leg later.
+    await swapTo(page, 'player-3')
+    await walkTo(page, 'player-3', [6.5, 7.0])
 
     // --- ENGINEER: steer the emitter. Safe to do first — with the mirrors at
     // their initial angles, NO heading can reach the receiver (Pillar A), so
