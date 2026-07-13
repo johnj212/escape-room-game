@@ -250,6 +250,23 @@ describe('Pillar A — no 2-role subset can complete Puzzle 3', () => {
     expect(hits).toBe(0)
   })
 
+  it('mutation control (pinned): the identical 373,248-combination sweep at the SOLUTION heading finds many hits — the no-Engineer proof is not vacuous', () => {
+    // Pinned literal (the D-6 lesson): the Phase-3 gate-verifier caught this
+    // figure quoted as 5,719 in STATUS.md while the sweep actually yields
+    // 10,733 — an unpinned evidence number had silently gone stale (it
+    // predated the emitter-arc recentring). Pinned, it can't drift again.
+    const { layout, solution } = createLaserLayout(SEED)
+    let hits = 0
+    for (let a = 0; a < MIRROR_STEPS; a++) {
+      for (let b = 0; b < MIRROR_STEPS; b++) {
+        for (let c = 0; c < MIRROR_STEPS; c++) {
+          if (traceLaser(layout, solution.emitterStep, [a, b, c]).terminal === 'receiver') hits++
+        }
+      }
+    }
+    expect(hits).toBe(10733)
+  })
+
   it('WITHOUT the Engineer (structural): the initial beam passes beyond every mirror’s reach, so no rotation can intercept it — seeds 0..49', () => {
     // The exhaustive proof above is the ground truth for one seed; this is the
     // structural invariant the generator enforces for all of them, checked

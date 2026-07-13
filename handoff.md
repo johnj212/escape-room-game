@@ -7,7 +7,64 @@
 
 ---
 
-## 0a. Current session handoff (2026-07-09, fourth session — PHASE 3 FEATURE-COMPLETE, gate OPEN) — READ FIRST
+## 0a. Current session handoff (2026-07-13, fifth session — PHASE 3 GATE CLOSED) — READ FIRST
+
+**Phase 3 is CLOSED (gate-verifier PASS on the first dispatch, 2026-07-13).**
+The next session starts **Phase 4: mobile/touch parity + adaptive ladder +
+graceful degradation (real-device verification is the gate)**. Read STATUS.md
+"Next: Phase 4" for the carried context; the headline constraints:
+
+- **Bundle headroom ~4 KB** (496.1 / 500 KiB). No new dependencies.
+- All mobile floor numbers so far are desktop-GPU emulations, recorded as such.
+
+### What this session did (all tool-verified, commits `06d67ab`…gate-close)
+
+1. **Reference-delta round 3** (docs/DELTA.md 2026-07-13): fixed a hero
+   REGRESSION (partition post moved into the camera eyeline by the Phase-3
+   doorway fix bloomed into a frame-wide white column — neon 2.2→0.9), reshaped
+   the laser props (real mirror faces, rim-frame state glow, housing detail),
+   shipped DELTA #5 wall machinery (~35K instanced tris, no new lights).
+   Pillar-C bands improved for free (right 95.9→77.1% <5%-sRGB, left
+   45.2→34.9%, pixel-checked). The machinery was a Sonnet-subagent task that
+   needed two orchestrator fix rounds — both bugs (depth basis buried behind
+   the panelling; free-floating confetti lamps) were only visible by LOOKING
+   at the re-render, not in lint/tests. Validate subagent visual work against
+   the actual frame, never the diff.
+2. **verify.mjs got its missing `--phase 3` manifest** (Phase 3 had never
+   wired one — the "battery PASS" claim would have been unrunnable).
+3. **Battery attempts 1–2 failed in the puzzle3 e2e and exposed three real
+   walker-model bugs** (the "flaky walk = real bug" memory held again):
+   teammates were goal-exempt in `blocked()` (the walker drove INTO the
+   Overseer's idle capsule 0.78 m from the left doorway waypoint); prop radii
+   were ~half the physical collider footprints (console 1.7 m base modeled at
+   r=0.4 — capsule wedged while probes read free); and a myopic greedy cannot
+   round a large keep-out (needs sustained walking away from the goal). Fixed
+   with honest per-prop radii + a 0.4 m **grid-BFS planner** (`planPath`) whose
+   waypoints the hold-key walker follows — suite ~3× faster (63 s). The escape
+   run also parks the Overseer clear of the doorway first.
+4. **Battery attempt 3: 6/6 HARD PASS** — desktop 60 fps / 2.076M tris / 545
+   draws (canary 60 healthy), mobile 60 fps / 1.94M tris, bundle 496.1 KB.
+5. **gate-verifier dispatched (fresh context) → PASS.** It independently
+   reproduced the battery, probe, hero capture and both pixel bands, and
+   re-ran the 373k Pillar-A sweep. Its one real finding: STATUS.md's
+   mutation-control figure had drifted (5,719 → actual **10,733**, a stale
+   pre-arc-recentring number). Fixed at gate close: docs corrected AND pinned
+   as a literal test (vitest now 103/103) — the D-6 lesson applies to
+   *evidence figures*, not just timing constants.
+
+### Verifier flags carried forward (non-blocking, scheduled)
+
+- **Stage-3 hero variant** for a future delta round: the fixed hero vantage
+  captures the lobby-launch state, so P3's laser geometry cannot be graded
+  from the committed hero shot (methodology gap, not a code defect).
+- **Alarm-escalation frame comparison** (timer-full vs timer-critical) to
+  substantiate the F-row claim visually.
+- D-4 GI residual (Pillar C), EnvironmentProbe round, ngrok revert — all as
+  before.
+
+---
+
+## 0b. Previous session handoff (2026-07-09, fourth session — PHASE 3 FEATURE-COMPLETE, gate OPEN)
 
 > This section is written to be **self-contained**: a fresh context window needs
 > only this, `STATUS.md`, and `Project_Requirements.md` to continue. Nothing from
@@ -67,7 +124,8 @@ store / net / HUD, and the win/lose sequences. `main` is clean at `6c1cac4`.
   headings × 50 seeds → never a hit. No Engineer: exhaustive over all 72³ =
   373,248 mirror combinations at the initial heading → 0 hits. No Overseer: an
   aligned beam misfires into lockout instead of winning. **Mutation control:** the
-  same 373k sweep at the *solution* heading yields 5,719 hits, so the test is not
+  same 373k sweep at the *solution* heading yields 10,733 hits (corrected 2026-07-13
+  from a stale 5,719 by the gate-verifier; now a pinned test), so the test is not
   vacuous.
 
 ### What's left (all GPU-serial — idle machine only)

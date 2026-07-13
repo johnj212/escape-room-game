@@ -33,7 +33,7 @@ Build the Sector-9 Command Deck: a 3-role, high-cooperation escape room (Enginee
 - [x] **Phase 0** — Scaffold + harness — **GATE CLOSED 2026-07-07, gate-verifier verdict PASS** (fresh-context agent; independently re-ran the battery → 3/3 HARD PASS, verified all six gate items with tool evidence, zero banned outcomes in the Phase-0 surface). Its two non-blocking flags are both addressed/scheduled: reference asset corrected (see below), font/PNG deviations formalization scheduled into Phase 1.
 - [x] **Phase 1 (xhigh)** — WebGPU render-layer rebuild + Puzzle 1 re-homed — **GATE CLOSED 2026-07-08, gate-verifier verdict PASS** (fresh-context agent; independent battery re-run 5/5 HARD incl. desktop 60fps/2.02M tris/484KB + mobile floors with healthy GPU canaries; every gate item verified with tool evidence; zero banned outcomes). Its main non-blocking flag (Pillar C: 37–77% near-black side walls after the D-5 light cuts) was fixed post-verdict — root cause was the ~1%-albedo dark-structural material, not the lights (tone `#0d1017`→`#242c3a`, metalness 0.9→0.7, vignette floor 0.8, ambient/hemisphere raised) — pixel-measured left 37→5% / right 77→45%, battery re-run 5/5 PASS after.
 - [x] **Phase 2** — Puzzle 2 (scanners) + 1 → 2 chain server-side; lockout; reference-delta — **GATE CLOSED 2026-07-09, gate-verifier verdict PASS on the second dispatch** (first dispatch FAILed on the D-6 window drift + Pillar-C edge-band; both fixed and re-verified same session — see "Phase 2 progress"). Second verifier independently re-ran the battery (6/6 HARD, 60 fps desktop with healthy canary), reproduced the pixel-check numbers byte-for-byte on its own fresh hero capture, and confirmed every gate item with tool evidence. Rubric: A 10, B 7, C 4 (D-4 GI residual, Phase-5 payback with `tools/pixel-check.mjs` as acceptance test), D 10, E 10, F 7, Perf 10, Reliability 10.
-- [ ] **Phase 3 (xhigh)** — Puzzle 3 (laser) + full escape; server-raycast validated; win/lose sequences; reference-delta
+- [x] **Phase 3 (xhigh)** — Puzzle 3 (laser) + full escape; server-raycast validated; win/lose sequences; reference-delta — **GATE CLOSED 2026-07-13, gate-verifier verdict PASS** (fresh-context agent; independently re-ran the battery → 6/6 HARD PASS with byte-reproduced perf numbers (desktop 60fps/2.076M tris/496.1KB, mobile 60fps/1.94M, canaries healthy), re-ran the authority probe standalone (14/14), re-captured the hero and byte-reproduced both pixel-check bands, independently re-ran the 373k no-Engineer sweep (0 hits confirmed) AND its solution-heading mutation control. Rubric: A 10, B 10, C 4 (D-4 GI residual, Phase-5 payback), D 10, E 10, F 7, Perf 10, Reliability 9). Its one real finding — STATUS.md's mutation-control figure had silently drifted (5,719 → actual 10,733) — was fixed at gate close: figure corrected here + in handoff.md and pinned as a literal-value test in `laserPuzzle.test.js` (103rd test, the D-6 lesson applied to evidence numbers). Non-blocking flags carried to Phase 5: stage-3 hero capture variant (the fixed hero vantage captures the lobby-launch state, so P3's laser geometry can't be graded from the committed shot — a methodology gap, not a code defect); a timer-critical vs timer-full frame comparison to substantiate the F-row alarm-escalation claim.
 - [ ] **Phase 4** — Mobile/touch parity + adaptive ladder + graceful degradation verified
 - [ ] **Phase 5** — Visual reference-delta pass + atmosphere/tension (Pillar F); self-score ≥ 7 all rows; human sign-off
 
@@ -172,7 +172,9 @@ keyboard, making P3 unsolvable.**
     plus the structural invariant (initial beam clears every mirror's max
     reach) checked across 50 seeds. No Overseer: an aligned beam misfires into
     lockout instead of winning. **Mutation control:** the same 373k sweep at the
-    SOLUTION heading yields 5,719 hits — the exhaustive test is not vacuous.
+    SOLUTION heading yields 10,733 hits — the exhaustive test is not vacuous.
+    (Correction 2026-07-13: originally recorded as 5,719 — a stale pre-arc-recentring
+    figure the Phase-3 gate-verifier caught; now a pinned test in laserPuzzle.test.js.)
   - **Gameplay bug found + fixed while testing (would have shipped invisibly):**
     with the emitter arc centred on +x, 11/200 seeds put the winning heading
     exactly on an arc end-stop, where the Engineer's dial cannot turn further.
@@ -267,8 +269,23 @@ keyboard, making P3 unsolvable.**
    `blocked()` model and follows decimated waypoints — suite ~3× faster.
    The escape run also parks the Overseer clear of the doorway first (an idle
    teammate is a solid capsule — the standing gotcha, now load-bearing).
-3. **gate-verifier dispatch** → fix findings → re-dispatch until PASS → close
-   the gate → STOP for handoff. ← NEXT
+3. **GATE CLOSED (2026-07-13): gate-verifier verdict PASS on first dispatch** —
+   see the Phase checklist entry for the full evidence + rubric. Its one
+   finding (drifted mutation-control figure) fixed and pinned at gate close;
+   vitest 103/103 + lint 0 after.
+
+## Next: Phase 4 — Mobile/touch parity + adaptive ladder + graceful degradation
+
+Fresh session starts here per the user's phase protocol. Carried context:
+- **Bundle headroom is ~4 KB** (496.1 of 500 KiB). Phase 4 must not add a
+  dependency; if it must, something else has to shrink first.
+- Real-device verification is Phase 4's gate (all mobile numbers so far are
+  desktop-GPU emulations, recorded as such).
+- Carried from the Phase-3 verifier: stage-3 hero capture variant + alarm-
+  escalation frame comparison (both Phase-5 delta-round items); D-4 GI payback
+  (Pillar C, acceptance test `tools/pixel-check.mjs`); EnvironmentProbe
+  debugging round; ngrok static-serving + `io(undefined)` still committed for
+  the user's public playtests (revert per CLAUDE.md markers when done).
 
 Carried: the EnvironmentProbe D-4 debugging round when the fps budget allows;
 Pillar-C residual under D-4 (acceptance test `tools/pixel-check.mjs`).
