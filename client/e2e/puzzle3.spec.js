@@ -46,7 +46,13 @@ const IN_RANGE = 2.2 // comfortably inside STATION_RANGE (3 m), with drift margi
 const POLL_MS = 140
 const PROBE = 0.8 // how far ahead a step is checked for clearance
 const CAPSULE = 0.35 // player capsule radius + a little slack
-const PROP_RADIUS = 0.4 // consoles, pedestals, mirror mounts
+// Per-kind prop radii, sized to the REAL collider footprints — an undersized
+// model lets the walker plan a skim that physically wedges the capsule on a
+// corner while every probe reads 'free' (battery run 2: player-2 pinned on the
+// switchboard console's 1.7×1.7 base, which the old uniform 0.4 called clear).
+const CONSOLE_RADIUS = 0.9 // P1 consoles: 1.7×1.7 base → half-extent 0.85
+const PEDESTAL_RADIUS = 0.55 // P2 scanner pedestals (keeps the doorway open)
+const MIRROR_RADIUS = 0.8 // mirror face is 1.5 long → worst-case reach 0.75
 const PLAYER_RADIUS = 0.35 // an idle teammate is a solid capsule
 const REACTOR = { pos: [0, -9], r: 1.9 }
 // The inner wall is at 9.75 and a capsule can rest at ~9.45. Keep this bound
@@ -95,19 +101,23 @@ async function swapTo(page, playerId) {
 // The OTHER two characters are solid capsules and are obstacles too — an idle
 // teammate parked in the doorway will stop the one you are driving.
 async function obstacles(page, playerId) {
-  const { props, others } = await page.evaluate((id) => {
+  const { consoles, scanners, mirrors, others } = await page.evaluate((id) => {
     const g = window.useGameStore.getState()
     const scanners = Object.values(window.__SCANNER_POSITIONS__)
     const mirrors = g.puzzleState.p3.layout.mirrors.map((m) => m.pos)
     return {
-      props: [[-5, 0], [5, 0], ...scanners, ...mirrors],
+      consoles: [[-5, 0], [5, 0]],
+      scanners,
+      mirrors,
       others: Object.values(g.players)
         .filter((p) => p.id !== id)
         .map((p) => [p.position[0], p.position[2]]),
     }
   }, playerId)
   return [
-    ...props.map((pos) => ({ pos, r: PROP_RADIUS })),
+    ...consoles.map((pos) => ({ pos, r: CONSOLE_RADIUS })),
+    ...scanners.map((pos) => ({ pos, r: PEDESTAL_RADIUS })),
+    ...mirrors.map((pos) => ({ pos, r: MIRROR_RADIUS })),
     ...others.map((pos) => ({ pos, r: PLAYER_RADIUS, player: true })),
     { pos: REACTOR.pos, r: REACTOR.r },
   ]
@@ -205,11 +215,89 @@ async function greedyWalk(page, playerId, goal, tolerance) {
   }
 }
 
-// Greedy descent cannot cross the security partition: rounding its open end
-// means walking AWAY from the goal first, which no distance-reducing step will
-// ever choose. Sector changes therefore get explicit waypoints.
-// z=7.4 sits in the doorway past the partition's +z end, clear of both the
-// pane (ends at z=6) and the overseer pedestal at [0, 8.5].
+// Route planner: breadth-first search on a 0.4 m grid over the same blocked()
+// model the walker probes with, decimated to direction-change waypoints that
+// greedyWalk then follows one straight hop at a time. The myopic greedy alone
+// livelocked twice in this deck: rounding a big keep-out (the 1.7 m console,
+// an idle teammate beside the doorway) means walking AWAY from the goal for
+// several steps, which no distance-reducing heuristic sustains. The room is
+// 20×20 m → ≤ ~2500 cells; planning is instant and deterministic.
+const GRID = 0.4
+
+function planPath(start, goal, obs, tolerance) {
+  const toCell = ([x, z]) => [Math.round(x / GRID), Math.round(z / GRID)]
+  const toWorld = ([i, j]) => [i * GRID, j * GRID]
+  const cellKey = ([i, j]) => `${i},${j}`
+  // Cells hugging the start stay legal even when the capsule rests inside a
+  // keep-out ring (e.g. it just finished operating that console).
+  const free = (w) =>
+    !blocked(w, obs, goal) || Math.hypot(w[0] - start[0], w[1] - start[1]) < 0.9
+
+  const startCell = toCell(start)
+  const parent = new Map([[cellKey(startCell), null]])
+  const queue = [startCell]
+  let endKey = null
+  while (queue.length) {
+    const c = queue.shift()
+    const w = toWorld(c)
+    if (Math.hypot(w[0] - goal[0], w[1] - goal[1]) < tolerance - 0.2) {
+      endKey = cellKey(c)
+      break
+    }
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const n = [c[0] + di, c[1] + dj]
+      const k = cellKey(n)
+      if (parent.has(k)) continue
+      const wn = toWorld(n)
+      if (Math.abs(wn[0]) > WALL || Math.abs(wn[1]) > WALL) continue
+      if (!free(wn)) continue
+      parent.set(k, cellKey(c))
+      queue.push(n)
+    }
+  }
+  if (!endKey) return null
+  const cells = []
+  for (let k = endKey; k; k = parent.get(k)) cells.push(k.split(',').map(Number))
+  cells.reverse()
+  const pts = []
+  for (let i = 1; i < cells.length - 1; i++) {
+    const [a, b, c] = [cells[i - 1], cells[i], cells[i + 1]]
+    if (b[0] - a[0] !== c[0] - b[0] || b[1] - a[1] !== c[1] - b[1]) pts.push(toWorld(cells[i]))
+  }
+  if (cells.length > 1) pts.push(toWorld(cells[cells.length - 1]))
+  return pts
+}
+
+async function pathWalk(page, playerId, goal, tolerance) {
+  const start = await readXZ(page, playerId)
+  if (Math.hypot(start[0] - goal[0], start[1] - goal[1]) < tolerance) return
+  const obs = await obstacles(page, playerId)
+  const pts = planPath(start, goal, obs, tolerance)
+  if (!pts) {
+    throw new Error(
+      `${playerId}: BFS found no route from [${start.map((n) => n.toFixed(2))}] to [${goal}] (tol ${tolerance})`
+    )
+  }
+  for (let i = 0; i < pts.length; i++) {
+    // Skip ahead if physics drift already carried us past a later waypoint.
+    let target = i
+    for (let j = pts.length - 1; j > i; j--) {
+      const pos = await readXZ(page, playerId)
+      if (Math.hypot(pos[0] - pts[j][0], pos[1] - pts[j][1]) < 0.6) {
+        target = j
+        break
+      }
+    }
+    i = target
+    await greedyWalk(page, playerId, pts[i], 0.5)
+  }
+}
+
+// Sector changes still get explicit doorway waypoints: z=7.4 sits in the
+// doorway past the partition's +z end, clear of both the pane (ends at z=6)
+// and the overseer pedestal at [0, 8.5]. The BFS could discover the crossing
+// on its own, but pinning the lane keeps the runs comparable and the failure
+// messages legible.
 const BYPASS = { z: 7.4, x: 2.2 }
 
 async function walkTo(page, playerId, goal) {
@@ -219,10 +307,10 @@ async function walkTo(page, playerId, goal) {
   const to = side(goal[0])
 
   if (from !== 0 && to !== 0 && from !== to) {
-    await greedyWalk(page, playerId, [from * BYPASS.x, BYPASS.z], 1.0)
-    await greedyWalk(page, playerId, [to * BYPASS.x, BYPASS.z], 1.0)
+    await pathWalk(page, playerId, [from * BYPASS.x, BYPASS.z], 1.0)
+    await pathWalk(page, playerId, [to * BYPASS.x, BYPASS.z], 1.0)
   }
-  await greedyWalk(page, playerId, goal, IN_RANGE)
+  await pathWalk(page, playerId, goal, IN_RANGE)
 }
 
 const p3 = (page) => page.evaluate(() => window.useGameStore.getState().puzzleState.p3)
