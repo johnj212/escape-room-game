@@ -43,10 +43,10 @@ const io = new Server(server, {
   }
 });
 
-// ⚠️  NGROK TESTING ONLY - DELETE BEFORE COMMIT
-// Serve built client files (client/dist) from Express root
-// This allows single-server deployment for ngrok testing.
-// For production, use a separate static file host or CDN.
+// Serve built client files (client/dist) from Express root.
+// Deliberate single-server deploy strategy (Render/Fly free tier): one Node
+// process serves both the static client build and the Socket.IO server on
+// the same origin/port, so no separate static host or CDN is needed.
 const path = require('path');
 app.use(express.static(path.join(__dirname, '../client/dist')));
 

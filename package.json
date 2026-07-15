@@ -10,6 +10,7 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build:client": "npm run build --prefix client",
     "build": "npm run build:client",
+    "start": "node server/index.js",
     "verify": "node tools/verify.mjs",
     "capture": "node tools/capture-hero.mjs",
     "perf": "node tools/perf-probe.mjs"

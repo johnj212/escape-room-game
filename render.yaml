@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: sector-9-command-deck
+    env: node
+    plan: free
+    buildCommand: npm run install:all && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 22.23.0

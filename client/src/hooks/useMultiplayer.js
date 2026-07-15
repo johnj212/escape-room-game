@@ -25,11 +25,10 @@ export const useMultiplayer = () => {
       return
     }
 
-    // Connect to Socket.io server
-    // ⚠️  NGROK TESTING ONLY - This connection strategy should be reverted after ngrok testing
-    // Socket.IO will auto-connect to the current origin (same host/port) when no URL provided.
-    // This allows the client (served by Express) to connect to the server on the same origin,
-    // whether that's localhost:3001 or https://your-ngrok-url.ngrok-free.dev
+    // Connect to Socket.io server. Deliberate same-origin strategy (not ngrok-specific):
+    // Socket.IO auto-connects to the current origin (same host/port) when no URL is
+    // provided, which is what the single-server Express+Socket.IO deploy relies on —
+    // works unchanged on localhost:3001, an ngrok tunnel, or the Render/Fly deploy URL.
     socket = io(undefined, {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
