@@ -7,7 +7,21 @@
 
 ---
 
-## 0a. Current session handoff (2026-07-13, fifth session — PHASE 3 GATE CLOSED) — READ FIRST
+## 0. Current session handoff (2026-07-15, sixth session — deploy side-quest, Phase 4 not started) — READ FIRST
+
+**Not phase work.** User wants the current build in front of family/friends,
+so this session added a Render free-tier Blueprint deploy (`render.yaml` +
+root `npm start`, commit `394e6d2`) on top of the already-single-server
+architecture — full details and the `tomtom`-branch gotcha in STATUS.md
+"Deploy (2026-07-15)". **Phase 4 still has not been started; it remains the
+next phase-ladder work.**
+
+**Flag for whoever picks up Phase 4:** a plain build this session measured the
+gzip bundle at ~509.4 KB, over the 500 KB §2 floor (was 496.1 KB at the
+Phase-3 gate). Not bisected yet — re-run `perf-probe.mjs --mode assert` first
+thing and find what grew before adding anything new.
+
+## 0a. Prior session handoff (2026-07-13, fifth session — PHASE 3 GATE CLOSED)
 
 **Phase 3 is CLOSED (gate-verifier PASS on the first dispatch, 2026-07-13).**
 The next session starts **Phase 4: mobile/touch parity + adaptive ladder +

@@ -277,18 +277,54 @@ keyboard, making P3 unsolvable.**
 ## Next: Phase 4 — Mobile/touch parity + adaptive ladder + graceful degradation
 
 Fresh session starts here per the user's phase protocol. Carried context:
-- **Bundle headroom is ~4 KB** (496.1 of 500 KiB). Phase 4 must not add a
-  dependency; if it must, something else has to shrink first.
+- **Bundle floor is currently MISSED, not just tight — re-measure before Phase 4 work.**
+  A plain `npm run build` on 2026-07-15 measured **506.10 KB gzip (index.js) +
+  3.31 KB (index.css) = ~509.4 KB**, excl. the carved-out Rapier WASM chunk —
+  over the §2 500 KB gzip floor, up from the 496.1 KB recorded at the Phase-3
+  gate close (`c2cb311`..`394e6d2`, no dependency changes in that range visible
+  from `package.json` diffs). Not yet bisected — first Phase-4 task should
+  re-run `perf-probe.mjs --mode assert` to confirm/quantify, then bisect what
+  grew. Do not add a dependency until this is back under floor.
 - Real-device verification is Phase 4's gate (all mobile numbers so far are
   desktop-GPU emulations, recorded as such).
 - Carried from the Phase-3 verifier: stage-3 hero capture variant + alarm-
   escalation frame comparison (both Phase-5 delta-round items); D-4 GI payback
   (Pillar C, acceptance test `tools/pixel-check.mjs`); EnvironmentProbe
-  debugging round; ngrok static-serving + `io(undefined)` still committed for
-  the user's public playtests (revert per CLAUDE.md markers when done).
+  debugging round.
 
 Carried: the EnvironmentProbe D-4 debugging round when the fps budget allows;
 Pillar-C residual under D-4 (acceptance test `tools/pixel-check.mjs`).
+
+## Deploy (2026-07-15) — Render free-tier blueprint added, outside the phase ladder
+
+Not a phase deliverable — a side-quest to get the current build in front of
+family/friends. The app already ran single-server (Express serves
+`client/dist` + Socket.IO on one origin; client connects via `io(undefined)`
+same-origin) from the ngrok-testing work, which turned out to be exactly the
+right shape for a free-tier PaaS deploy — no architecture change needed, only
+plumbing:
+- `render.yaml` (Blueprint manifest) + a root `npm start` (`node server/index.js`)
+  added in `394e6d2`. Verified locally end-to-end before pushing: built the
+  client, ran the server standalone, confirmed `/`, `/socket.io/...`, and a
+  built JS asset all 200 from the same port.
+- The two "NGROK TESTING ONLY — delete before commit" comments (`server/index.js`,
+  `useMultiplayer.js`) were **relabeled, not deleted** — same-origin serving
+  is now the permanent deploy strategy, not throwaway test scaffolding. The
+  CLAUDE.md ngrok-cleanup instructions predate this and no longer apply to
+  those two spots.
+- **Gotcha:** Render's Blueprint deploy reads `render.yaml` off whatever branch
+  the service is pointed at. First attempt failed with "Blueprint file
+  render.yaml not found on main branch" because the file was still local/
+  uncommitted; a second, unexplained mismatch traced to the Render dashboard
+  service being pointed at a branch (`tomtom`) that doesn't exist in this repo
+  or its `origin` at all (`git branch -a` after `git fetch` shows only `main`
+  and `docs/sector9-requirements-scaffold`) — likely a stray/typo'd branch
+  selection made directly in the Render UI when the service was first created,
+  unrelated to anything in this repo. Fix is on the Render side: Settings →
+  branch → `main`.
+- Free-tier caveat to flag to playtesters: the service spins down after 15 min
+  idle; first request after that takes ~30-60s to wake, which will look like
+  a hang on a cold "start game" click.
 
 ## Gotchas (append-only; newest first)
 
